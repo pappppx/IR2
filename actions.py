@@ -5,47 +5,34 @@ import random
 
 # ————— Parámetros —————
 SAMPLE_DT       = 1.0      # segundos entre muestras
-AVOID_THRESHOLD = 200      # valor IR a partir del cual hay obstáculo
-AVOID_SPEED     = 20       # velocidad de retroceso y giro
-AVOID_TIME      = 0.3      # tiempo de cada maniobra de evitación
+AVOID_THRESHOLD = 15      # valor IR a partir del cual hay obstáculo
 
-IR_SENSORS = [
-    IR.BackC,
-    IR.BackL,
-    IR.BackR,
-    IR.FrontC,
-    IR.FrontL,
-    IR.FrontLL,
-    IR.FrontR,
-    IR.FrontRR
-]
-
-AVOID_ACTIONS = {
-    IR.FrontC:  (-AVOID_SPEED,       -AVOID_SPEED),
-    IR.FrontL:  (-AVOID_SPEED//2,    -AVOID_SPEED),   # back + turn right
-    IR.FrontLL: (-AVOID_SPEED//2,    -AVOID_SPEED),   # idem FrontL
-    IR.FrontR:  (-AVOID_SPEED,       -AVOID_SPEED//2),# back + turn left
-    IR.FrontRR: (-AVOID_SPEED,       -AVOID_SPEED//2),# idem FrontR
-
-    IR.BackC:   (AVOID_SPEED,        AVOID_SPEED),
-    IR.BackL:   (AVOID_SPEED//2,     AVOID_SPEED),    # forward + turn right
-    IR.BackR:   (AVOID_SPEED,        AVOID_SPEED//2), # forward + turn left
-}
-
-DISCRETE_ACTIONS = {
-    -90:{'l':10,'r':-10},
-    -45:{'l':8,'r':4},
-    0:{'l':10,'r':10},
-    45:{'l':4,'r':8},
-    90:{'l':-10,'r':10}
-    }
-
-def perform_simple_action(robot, angulo, duration=2.0):
+def perform_simple_action(robot, angle, duration=1.0):
     # tu diccionario ACCIONES de antes
-    v = DISCRETE_ACTIONS[angulo]
-    robot.moveWheels(v['l'], v['r'])
-    robot.wait(duration)
-    robot.stopMotors()
+    spin_speed = 20
+    forward_speed = 20
+
+    # Calcular tiempo de giro proporcional
+    t_turn = abs(angle) / 180.0 * 1.75
+
+    # Giro sobre sí mismo
+    if angle > 0:
+        robot.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
+        robot.wait(0.1)
+        if avoid_if_needed(robot):
+            return None # Que quede reflejado en el dataset que hizo un movimiento evasivo
+        
+    elif angle < 0:
+        robot.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
+        robot.wait(0.1)
+        if avoid_if_needed(robot):
+            return None # Que quede reflejado en el dataset que hizo un movimiento evasivo
+    # angle == 0: no gira
+
+    # Avanzar en línea recta
+    robot.moveWheelsByTime(forward_speed, forward_speed, duration)
+    robot.wait(0.5)
+    return angle
     
 def perform_continuous_action(robot, left_power, right_power, duration=1.0):
     """
@@ -65,23 +52,48 @@ def sample_random_continuous_action(max_power=15):
     return (random.randint(-max_power, max_power),
             random.randint(-max_power, max_power))
 
-def avoid_if_needed(robot, threshold=AVOID_THRESHOLD):
+def avoid_if_needed(robot, threshold=12):
     """
-    Lee todos los sensores IR. Si alguno detecta obstáculo (valor > threshold),
-    ejecuta la maniobra mapeada en AVOID_ACTIONS y sale.
+    Lee solo los sensores frontales. Si alguno está por encima del umbral,
+    prioriza el que dé mayor valor y gira en consecuencia:
+      FrontC  -> 180°
+      FrontRR -> 135°
+      FrontLL -> 225°
+    usando moveWheelsByTime(20, -20, duration).
+    Devuelve True si hizo una maniobra, False en caso contrario.
     """
-    for s in IR_SENSORS:
-        val = robot.readIRSensor(s)
-        if val and val > threshold:
-            print(f"  ¡Obstáculo detectado en {s.name} ({val})! Maniobra de evitación:")
-            # obtener acción según sensor; por defecto retrocede
-            left_spd, right_spd = AVOID_ACTIONS.get(
-                s,
-                (-AVOID_SPEED, -AVOID_SPEED)  # fallback: retroceder recto
-            )
-            # ejecutar maniobra
-            robot.stopMotors()
-            robot.moveWheels(left_spd, right_spd)
-            robot.wait(AVOID_TIME)
-            robot.stopMotors()
-            break
+    # Sensores frontales
+    front_sensors = [IR.FrontC, IR.FrontLL, IR.FrontRR]
+    readings = {}
+    for s in front_sensors:
+        val = robot.readIRSensor(s) or 0
+        readings[s] = val
+
+    # Filtrar los que sobrepasan el umbral
+    detected = {s: v for s, v in readings.items() if v > threshold}
+    if not detected:
+        return False
+
+    # Elegir el sensor con mayor lectura
+    sensor = max(detected, key=detected.get)
+    val = detected[sensor]
+
+    # Determinar ángulo de giro
+    if sensor == IR.FrontC:
+        angle = 180
+    elif sensor == IR.FrontRR:
+        angle = 180 - 45    # 135°
+    else:  # IR.FrontLL
+        angle = 180 + 45    # 225°
+
+    # Calcular duración proporcional (1.75 s = 180°)
+    duration = angle / 180.0 * 1.75
+
+    print(f"  ¡Obstáculo detectado en {sensor.name} ({val})! Girando {angle}° " +
+          f"({duration:.2f}s)")
+
+    # Ejecutar giro sobre sí mismo
+    robot.moveWheelsByTime(20, -20, duration)
+    robot.moveWheelsByTime(20, 20, 1.5)
+    robot.wait(0.2)
+    return True
