@@ -13,38 +13,46 @@ def collect_simple_dataset(robot, sim, n_samples):
 
     for i in range(n_samples):
 
-        print(f"Epoch {i}")
-
         # 1) Medimos P(t) en modo simple
         P_t = get_simple_perceptions(sim)
-        
+        robot.wait(0.1)
         # 2) Escogemos y ejecutamos acción discreta
         accion = random.choice([-90, -45, 0, 45, 90])
-        perform_simple_action(robot, accion, duration=2.0)
+        print(f"Epoch {i}, action {accion}")
+        angle  = perform_simple_action(robot, accion, duration=1.0)
+        robot.wait(0.25)
+        sim.wait(0.25)
         
-        # 3) Medimos P(t+1)
-        P_t1 = get_simple_perceptions(sim)
-        
-        avoid_if_needed(robot)
-        
-        # 4) Guardamos la muestra
-        dataset.append({
-            "red_rotation_t":   P_t["red_rotation"],
-            "red_position_t":   P_t["red_position"],
-            "green_rotation_t": P_t["green_rotation"],
-            "green_position_t": P_t["green_position"],
-            "blue_rotation_t":  P_t["blue_rotation"],
-            "blue_position_t":  P_t["blue_position"],
+        if angle == None:
+            # Si el robot ha realizado un movimiento evasivo, no guardamos la muestra
+            robot.wait(0.1)
+            
+        else:
+            # 3) Medimos P(t+1)
+            P_t1 = get_simple_perceptions(sim)
+            if avoid_if_needed(robot):
+                # Si el robot se ha movido, espera un poco para estabilizarse
+                robot.wait(0.1)
+            
+            # 4) Guardamos la muestra
+            else:
+                dataset.append({
+                "red_rotation_t":   P_t["red_rotation"],
+                "red_position_t":   P_t["red_position"],
+                "green_rotation_t": P_t["green_rotation"],
+                "green_position_t": P_t["green_position"],
+                "blue_rotation_t":  P_t["blue_rotation"],
+                "blue_position_t":  P_t["blue_position"],
 
-            "action":  accion,
+                "action":  accion,
 
-            "red_rotation_t1":   P_t1["red_rotation"],
-            "red_position_t1":   P_t1["red_position"],
-            "green_rotation_t1": P_t1["green_rotation"],
-            "green_position_t1": P_t1["green_position"],
-            "blue_rotation_t1":  P_t1["blue_rotation"],
-            "blue_position_t1":  P_t1["blue_position"],
-        })
+                "red_rotation_t1":   P_t1["red_rotation"],
+                "red_position_t1":   P_t1["red_position"],
+                "green_rotation_t1": P_t1["green_rotation"],
+                "green_position_t1": P_t1["green_position"],
+                "blue_rotation_t1":  P_t1["blue_rotation"],
+                "blue_position_t1":  P_t1["blue_position"],
+                })
 
     return pd.DataFrame(dataset)
 
@@ -96,8 +104,8 @@ def collect_dataset(robot, sim, n_samples=50, export_name=None, simple=True):
     if export_name is not None:
         try:
             return pd.read_csv(DEFAULT_CSV_PATH + export_name)
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
+        except (FileNotFoundError, pd.errors.EmptyDataError) as e:
+            print(f"Warning: no pude cargar CSV, lo regenero ({e})")
 
     if simple:
         dataset = collect_simple_dataset(robot, sim, n_samples)
