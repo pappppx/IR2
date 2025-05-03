@@ -1,13 +1,15 @@
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
+from sklearn.multioutput import MultiOutputRegressor
 import tensorflow as tf
-from tensorflow import Sequential
-from tensorflow import Dense
-from tensorflow import EarlyStopping
-
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.callbacks import EarlyStopping
 
 def train_simple_model(csv_path):
 
@@ -41,8 +43,8 @@ def train_simple_model(csv_path):
         "blue_position_t1"
     ]
     
-    X = df[feature_cols].values
-    y = df[target_cols].values
+    X = df[feature_cols]
+    y = df[target_cols]
 
     # --- 2) Split train/test 80/20 ---
     X_train, X_test, y_train, y_test = train_test_split(
@@ -88,8 +90,7 @@ def train_simple_model(csv_path):
 
     y_pred = model.predict(X_test_s)
     mse_mlp = mean_squared_error(y_test, y_pred)
-    print(f"[Simple] MLP(256,256) MSE: {mse_mlp:.4f}")
-
+    print(f"Trained model MSE: {mse_mlp:.4f}")
     
 
 def train_complex_model(df):
