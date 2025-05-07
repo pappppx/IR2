@@ -19,7 +19,7 @@ def collect_simple_dataset(robot, sim, n_samples):
         # 2) Escogemos y ejecutamos acción discreta
         accion = random.choice([-90, -45, 0, 45, 90])
         print(f"Epoch {i}, action {accion}")
-        angle  = perform_simple_action(robot, accion, duration=1.0)
+        angle  = perform_simple_action(robot, accion, duration=0.5)
         robot.wait(0.25)
         sim.wait(0.25)
         

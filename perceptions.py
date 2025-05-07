@@ -11,10 +11,15 @@ def angle_to_target(robot_pos, robot_yaw_deg, target_pos):
     dx = target_pos['x'] - robot_pos['x']
     dz = target_pos['z'] - robot_pos['z']
     
+    # Ángulo absoluto desde el robot hacia el objetivo
     angle_to_target_rad = math.atan2(dz, dx)
     angle_to_target_deg = math.degrees(angle_to_target_rad)
     
-    relative_angle = (angle_to_target_deg - robot_yaw_deg + 360) % 360
+    # Diferencia cruda entre la orientación del robot y el objetivo
+    raw = angle_to_target_deg - robot_yaw_deg
+    
+    # Normalizamos a (-180, 180]
+    relative_angle = (raw + 180) % 360 - 180
     
     return relative_angle
 
