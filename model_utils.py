@@ -223,3 +223,99 @@ def train_wide_and_deep_model_tf(csv_path):
 
     y_pred = model.predict(X_test, verbose=0)
     _print_split_mse(y_test, y_pred, label="[Wide&Deep TF]")
+    
+# índices para separar en y_true/y_pred
+ANGLE_IDX = [0]  # angle_t1
+DIST_IDX  = [1]  # dist_t1
+
+def _load_and_split_new(csv_path, test_frac=0.2, seed=42):
+    df = pd.read_csv(csv_path)
+    # normalizamos la acción al rango [-1,1]
+    df["action"] = df["action"] / 90.0
+    
+    X = df[["angle_t", "dist_t", "action"]].values.astype(np.float32)
+    y = df[["angle_t1", "dist_t1"]].values.astype(np.float32)
+    
+    return train_test_split(X, y, test_size=test_frac, random_state=seed)
+
+def _print_new_mse(y_true, y_pred, label=""):
+    mse_total = mean_squared_error(y_true, y_pred)
+    mse_angle = mean_squared_error(y_true[:, ANGLE_IDX], y_pred[:, ANGLE_IDX])
+    mse_dist  = mean_squared_error(y_true[:, DIST_IDX],  y_pred[:, DIST_IDX])
+    print(f"{label} → MSE total: {mse_total:.4f},  MSE ángulo: {mse_angle:.4f},  MSE distancia: {mse_dist:.4f}")
+
+def train_mlp_model_new(csv_path):
+    X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
+    
+    normalizer = Normalization()
+    normalizer.adapt(X_train)
+    
+    m = Sequential([
+        Input(shape=(3,)),
+        normalizer,
+        Dense(64, activation="relu"),
+        Dense(64, activation="relu"),
+        Dense(2,  activation="linear")
+    ])
+    m.compile(optimizer="adam", loss="mse")
+    
+    es = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
+    m.fit(X_train, y_train, validation_split=0.1,
+          epochs=500, batch_size=32, callbacks=[es], verbose=0)
+    
+    y_pred = m.predict(X_test, verbose=0)
+    _print_new_mse(y_test, y_pred, label="[MLP]")
+
+def train_deep_model_new(csv_path):
+    X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
+    
+    normalizer = Normalization()
+    normalizer.adapt(X_train)
+    
+    m = Sequential([
+        Input(shape=(3,)),
+        normalizer,
+        Dense(128, activation="relu"),
+        Dense(64,  activation="relu"),
+        Dense(32,  activation="relu"),
+        Dense(2,   activation="linear")
+    ])
+    m.compile(optimizer="adam", loss="mse")
+    
+    es = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
+    m.fit(X_train, y_train, validation_split=0.1,
+          epochs=500, batch_size=32, callbacks=[es], verbose=0)
+    
+    y_pred = m.predict(X_test, verbose=0)
+    _print_new_mse(y_test, y_pred, label="[Deep]")
+
+def train_wide_and_deep_model_new(csv_path):
+    X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
+    
+    normalizer = Normalization()
+    normalizer.adapt(X_train)
+    
+    inp  = Input(shape=(3,))
+    norm = normalizer(inp)
+    
+    # rama wide lineal
+    wide = Dense(2, activation="linear")(norm)
+    
+    # rama deep no lineal
+    d = Dense(64, activation="relu")(norm)
+    d = Dense(32, activation="relu")(d)
+    deep = Dense(2, activation="linear")(d)
+    
+    # fusion y proyección
+    merged = Concatenate()([wide, deep])
+    out    = Dense(2, activation="linear")(merged)
+    
+    m = Model(inp, out)
+    m.compile(optimizer="adam", loss="mse")
+    
+    es = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
+    m.fit(X_train, y_train, validation_split=0.1,
+          epochs=500, batch_size=32, callbacks=[es], verbose=0)
+    
+    y_pred = m.predict(X_test, verbose=0)
+    _print_new_mse(y_test, y_pred, label="[Wide&Deep]")
