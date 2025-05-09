@@ -17,11 +17,21 @@ def main():
     rob.moveTiltTo(110,20)
     rob.moveTiltTo(90,20)
     collect_dataset(rob, sim, n_samples=400, export_name="2.csv", simple=True)
+    sim.resetSimulation()
+    sim.wait(3)
+    rob.moveTiltTo(110,20)
+    rob.moveTiltTo(90,20)
+    collect_dataset(rob, sim, n_samples=400, export_name="3.csv", simple=True)
+    sim.resetSimulation()
+    sim.wait(3)
+    rob.moveTiltTo(110,20)
+    rob.moveTiltTo(90,20)
+    collect_dataset(rob, sim, n_samples=400, export_name="4.csv", simple=True)
     
     sim.disconnect()
     rob.disconnect()
     
-    merge_csv_files(input_dir="datasets/", output_file="datasets/merged_05.csv", start=1, end=2)
+    merge_csv_files(input_dir="datasets/", output_file="datasets/05_18_1_6k.csv", start=1, end=2)
 
 if __name__ == '__main__':
     main()

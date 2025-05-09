@@ -1,11 +1,46 @@
 import random
 from robobopy.utils.IR import IR
-import random
 
 
 # ————— Parámetros —————
 SAMPLE_DT       = 1.0      # segundos entre muestras
 AVOID_THRESHOLD = 15      # valor IR a partir del cual hay obstáculo
+
+from perceptions import get_simple_perceptions
+from actions import avoid_if_needed
+import numpy as np
+
+def perform_main_action(robot, sim, angle, duration=1.0):
+    """
+    Ejecuta SOLO el giro + avance (tu acción cognitiva) y devuelve
+    el estado medido justo después de esa maniobra, antes de cualquier evitado.
+    """
+    spin_speed = 20
+    forward_speed = 20
+    # 1) Girar proporcional a angle
+    t_turn = abs(angle) / 180.0 * 1.75
+    if angle > 0:
+        robot.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
+    elif angle < 0:
+        robot.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
+    # 2) Avanzar recto
+    robot.moveWheelsByTime(forward_speed, forward_speed, duration)
+    robot.wait(0.1)
+    # 3) Leer percepción justo tras la maniobra principal
+    P = get_simple_perceptions(sim)
+    S_main = np.array([
+        P['red_rotation'],  P['red_position'],
+        P['green_rotation'],P['green_position'],
+        P['blue_rotation'], P['blue_position']
+    ], dtype=np.float32)
+    # 4) Ejecutar evitado si es necesario, pero sin volver a leer
+    if avoid_if_needed(robot):
+        robot.wait(0.1)
+    # 5) Devolver estado tras la acción cognitiva
+    return S_main
+
+
+
 
 def perform_simple_action(robot, angle, duration=1.0):
     # tu diccionario ACCIONES de antes
