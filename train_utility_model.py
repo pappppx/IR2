@@ -1,9 +1,9 @@
 import pickle
-from train_utility_model import train_utility_model
+from utility_utils import train_utility_model
 
 def main():
     # 1) Carga de las trazas previamente guardadas
-    with open("all_traces_130.pkl", "rb") as f:
+    with open("all_traces_330_4.pkl", "rb") as f:
         all_traces = pickle.load(f)
     print(f"Cargadas {len(all_traces)} trazas para entrenamiento.")
 
@@ -11,7 +11,7 @@ def main():
     model = train_utility_model(
         traces=all_traces,
         window=10,
-        save_path="utility_model.keras"
+        save_path="utility_model_330_4.keras"
     )
 
     print("Entrenamiento completado y modelo guardado.")

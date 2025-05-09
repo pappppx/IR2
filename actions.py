@@ -7,7 +7,6 @@ SAMPLE_DT       = 1.0      # segundos entre muestras
 AVOID_THRESHOLD = 15      # valor IR a partir del cual hay obstáculo
 
 from perceptions import get_simple_perceptions
-from actions import avoid_if_needed
 import numpy as np
 
 def perform_main_action(robot, sim, angle, duration=1.0):
