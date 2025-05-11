@@ -15,119 +15,9 @@ from tensorflow.keras.callbacks import EarlyStopping
 ANGLE_COLS = [0, 2, 4]  # red_rot, green_rot, blue_rot
 POS_COLS   = [1, 3, 5]  # red_pos, green_pos, blue_pos
 
-def train_simple_model(csv_path):
-    df = pd.read_csv(csv_path)
-    df["action"] /= 90.0
-
-    feature_cols = [
-        "red_rotation_t", "red_position_t",
-        "green_rotation_t", "green_position_t",
-        "blue_rotation_t", "blue_position_t",
-        "action"
-    ]
-    target_cols = [
-        "red_rotation_t1","red_position_t1",
-        "green_rotation_t1","green_position_t1",
-        "blue_rotation_t1","blue_position_t1"
-    ]
-    
-    X = df[feature_cols]
-    y = df[target_cols]
-
-    # 1) Split 80/20
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=42
-    )
-
-    # 2) Baseline: P(t+1) = P(t)
-    #    Tomamos solo las 6 columnas de percepción y las convertimos a numpy
-    baseline_pred = X_test[feature_cols[:-1]].values  # descartar 'action'
-    y_test_arr    = y_test.values
-
-    # MSE Ángulos y Posiciones del baseline
-    base_mse_angles    = mean_squared_error(
-        y_test_arr[:, ANGLE_COLS],
-        baseline_pred[:, ANGLE_COLS]
-    )
-    base_mse_positions = mean_squared_error(
-        y_test_arr[:, POS_COLS],
-        baseline_pred[:, POS_COLS]
-    )
-    print(f"Baseline MSE (ángulos):    {base_mse_angles:.4f}")
-    print(f"Baseline MSE (posiciones): {base_mse_positions:.4f}")
-
-    # 3) Escalado
-    scaler = StandardScaler()
-    X_train_s = scaler.fit_transform(X_train)
-    X_test_s  = scaler.transform(X_test)
-    
-    # 4) MLP 64-64-6 en TensorFlow/Keras
-    n_feats = X_train_s.shape[1]
-    n_tars  = y_train.shape[1]
-    model = Sequential([
-        Dense(64, activation='relu', input_shape=(n_feats,)),
-        Dense(64, activation='relu'),
-        Dense(n_tars, activation='linear')
-    ])
-    model.compile(optimizer='adam', loss='mse')
-    es = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-
-    model.fit(
-        X_train_s, y_train.values,
-        validation_split=0.1,
-        epochs=500,
-        batch_size=32,
-        callbacks=[es],
-        verbose=0
-    )
-
-    # 5) Predicción y métricas
-    y_pred = model.predict(X_test_s)
-
-    mse_total = mean_squared_error(y_test_arr, y_pred)
-    mse_angles    = mean_squared_error(
-        y_test_arr[:, ANGLE_COLS],
-        y_pred[:,       ANGLE_COLS]
-    )
-    mse_positions = mean_squared_error(
-        y_test_arr[:, POS_COLS],
-        y_pred[:,       POS_COLS]
-    )
-
-    print(f"[Martin] -> MSE (ángulos):    {mse_angles:.4f}")
-    print(f"[Martin] -> MSE (posiciones): {mse_positions:.4f}")
-
-
-def _load_and_split(csv_path, test_frac=0.2, seed=42):
-    df = pd.read_csv(csv_path)
-    df["action"] = df["action"] / 90.0
-    # barajar antes de split
-    df = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
-
-    feat_cols = [
-        "red_rotation_t","red_position_t",
-        "green_rotation_t","green_position_t",
-        "blue_rotation_t","blue_position_t",
-        "action"
-    ]
-    targ_cols = [
-        "red_rotation_t1","red_position_t1",
-        "green_rotation_t1","green_position_t1",
-        "blue_rotation_t1","blue_position_t1"
-    ]
-
-    X = df[feat_cols].values.astype(np.float32)
-    y = df[targ_cols].values.astype(np.float32)
-
-    return train_test_split(X, y, test_size=test_frac, random_state=seed)
-
-def _print_split_mse(y_true, y_pred, label=""):
-    mse_angles   = mean_squared_error(y_true[:, ANGLE_COLS], y_pred[:, ANGLE_COLS])
-    mse_positions= mean_squared_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
-    print(f"{label} → MSE Ángulos: {mse_angles:.4f}, MSE Posiciones: {mse_positions:.4f}")
-
 
 def train_mlp_model_tf(csv_path):
+    print("Training MLP model...")
     X_train, X_test, y_train, y_test = _load_and_split(csv_path)
 
     normalizer = Normalization()
@@ -141,14 +31,16 @@ def train_mlp_model_tf(csv_path):
         Dense(y_train.shape[1], activation='linear')
     ])
     model.compile(loss='mse', optimizer='adam')
-    es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+    
+    callbacks = []
+    callbacks.append(EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True))
 
     model.fit(
         X_train, y_train,
         validation_split=0.1,
         epochs=500,
         batch_size=32,
-        callbacks=[es],
+        callbacks=callbacks,
         verbose=0
     )
 
@@ -157,6 +49,7 @@ def train_mlp_model_tf(csv_path):
 
 
 def train_deep_model_tf(csv_path):
+    print("Training Deep model...")
     X_train, X_test, y_train, y_test = _load_and_split(csv_path)
 
     normalizer = Normalization()
@@ -171,14 +64,16 @@ def train_deep_model_tf(csv_path):
         Dense(y_train.shape[1], activation='linear')
     ])
     model.compile(loss='mse', optimizer='adam')
-    es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+
+    callbacks = []
+    callbacks.append(EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True))
 
     model.fit(
         X_train, y_train,
         validation_split=0.1,
         epochs=500,
         batch_size=32,
-        callbacks=[es],
+        callbacks=callbacks,
         verbose=0
     )
 
@@ -187,6 +82,7 @@ def train_deep_model_tf(csv_path):
 
 
 def train_wide_and_deep_model_tf(csv_path):
+    print("Training Wide & Deep model...")
     X_train, X_test, y_train, y_test = _load_and_split(csv_path)
 
     normalizer = Normalization()
@@ -210,23 +106,54 @@ def train_wide_and_deep_model_tf(csv_path):
 
     model = Model(inp, out)
     model.compile(loss='mse', optimizer='adam')
-    es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+
+    callbacks = []
+    callbacks.append(EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True))
 
     model.fit(
         X_train, y_train,
         validation_split=0.1,
         epochs=500,
         batch_size=32,
-        callbacks=[es],
+        callbacks=callbacks,
         verbose=0
     )
 
     y_pred = model.predict(X_test, verbose=0)
     _print_split_mse(y_test, y_pred, label="[Wide&Deep TF]")
+
+
+def _load_and_split(csv_path, test_frac=0.2, seed=42):
+    df = pd.read_csv(csv_path)
+
+    feat_cols = [
+        "red_rotation_t","red_position_t",
+        "green_rotation_t","green_position_t",
+        "blue_rotation_t","blue_position_t",
+        "action"
+    ]
+    targ_cols = [
+        "red_rotation_t1","red_position_t1",
+        "green_rotation_t1","green_position_t1",
+        "blue_rotation_t1","blue_position_t1"
+    ]
+
+    X = df[feat_cols].values.astype(np.float32)
+    y = df[targ_cols].values.astype(np.float32)
+
+    return train_test_split(X, y, test_size=test_frac, random_state=seed)
+
+
+def _print_split_mse(y_true, y_pred, label=""):
+    mse_angles   = mean_squared_error(y_true[:, ANGLE_COLS], y_pred[:, ANGLE_COLS])
+    mse_positions= mean_squared_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
+    print(f"{label} → MSE Ángulos: {mse_angles:.4f}, MSE Posiciones: {mse_positions:.4f}")
     
+
 # índices para separar en y_true/y_pred
 ANGLE_IDX = [0]  # angle_t1
 DIST_IDX  = [1]  # dist_t1
+
 
 def _load_and_split_new(csv_path, test_frac=0.2, seed=42):
     df = pd.read_csv(csv_path)
@@ -238,13 +165,16 @@ def _load_and_split_new(csv_path, test_frac=0.2, seed=42):
     
     return train_test_split(X, y, test_size=test_frac, random_state=seed)
 
+
 def _print_new_mse(y_true, y_pred, label=""):
     mse_total = mean_squared_error(y_true, y_pred)
     mse_angle = mean_squared_error(y_true[:, ANGLE_IDX], y_pred[:, ANGLE_IDX])
     mse_dist  = mean_squared_error(y_true[:, DIST_IDX],  y_pred[:, DIST_IDX])
     print(f"{label} → MSE total: {mse_total:.4f},  MSE ángulo: {mse_angle:.4f},  MSE distancia: {mse_dist:.4f}")
 
+
 def train_mlp_model_new(csv_path):
+    print("Training MLP model (new)...")
     X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
     
     normalizer = Normalization()
@@ -266,7 +196,9 @@ def train_mlp_model_new(csv_path):
     y_pred = m.predict(X_test, verbose=0)
     _print_new_mse(y_test, y_pred, label="[MLP]")
 
+
 def train_deep_model_new(csv_path):
+    print("Training Deep model (new)...")
     X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
     
     normalizer = Normalization()
@@ -289,7 +221,9 @@ def train_deep_model_new(csv_path):
     y_pred = m.predict(X_test, verbose=0)
     _print_new_mse(y_test, y_pred, label="[Deep]")
 
+
 def train_wide_and_deep_model_new(csv_path):
+    print("Training Wide & Deep model (new)...")
     X_train, X_test, y_train, y_test = _load_and_split_new(csv_path)
     
     normalizer = Normalization()
