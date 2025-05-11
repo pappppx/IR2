@@ -147,7 +147,7 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             })
 
         # Ordernar por novedad
-        candidate_states = sorted(candidate_states, key=lambda x: x['novelty'])
+        candidate_states = sorted(candidate_states, key=lambda x: x['novelty'], reverse=True)
 
         # for state in candidate_states:
         #     print(f"Accion: {state['action']}, Novedad: {state['novelty']:.4f}")
