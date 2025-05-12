@@ -1,5 +1,7 @@
 from tensorflow.keras.models import load_model
 from utility_utils import intrinsic_exploration_loop
+from perceptions import get_simple_perceptions
+from actions import perform_random_action
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
 import pickle
@@ -17,6 +19,7 @@ episodes  = 20
 
 for ep in range(episodes):
     print(f"\n=== Episodio {ep+1} ===")
+    perform_random_action(rob)
     trace = intrinsic_exploration_loop(
         rob,
         sim,
@@ -27,6 +30,11 @@ for ep in range(episodes):
         goal_thresh=350.0
     )
     all_traces.append(trace)
+
+    sim.resetSimulation()
+    sim.wait(0.5)
+
+print(all_traces)
 
 # Guardar trazas
 with open("all_traces_130.pkl", "wb") as f:

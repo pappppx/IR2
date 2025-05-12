@@ -52,69 +52,23 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
     return model
 
 
-def novelty(candidate: np.ndarray, memory: np.ndarray, n: float = 1.0) -> float:
+def novelty(candidate_state, memory_states, n=1, M=5):
+    # Convert inputs to numpy arrays
+    c = np.asarray(candidate_state, dtype=float)
+    memory = np.asarray(memory_states, dtype=float)
 
-    diffs = memory - candidate[np.newaxis, :]
-    dists = np.linalg.norm(diffs, axis=1)
-    return np.mean(dists ** n)
+    # Determine how many memory states to use
+    M_use = min(M, memory.shape[0])
+    recent_memory = memory[-M_use:]
 
+    dists = np.linalg.norm(recent_memory - c, axis=1)
+    novelty_score = np.mean(dists ** n)
 
-# def intrinsic_exploration_loop(robot, sim, world_model, actions,
-#                                n: float = 1.0,
-#                                max_steps: int = 100,
-#                                goal_thresh: float = 250.0):
-#     """
-#     Genera una traza (lista de estados 6-D) explorando por novedad.
-#     Cada estado S = [red_rot, red_dist, green_rot, green_dist, blue_rot, blue_dist].
-#     """
+    return novelty_score
 
-#     # 1) Estado inicial
-#     P = get_simple_perceptions(sim)
-#     S_t = np.array([
-#         P['red_rotation'],  P['red_position'],
-#         P['green_rotation'],P['green_position'],
-#         P['blue_rotation'], P['blue_position']
-#     ], dtype=np.float32)
-#     memory = [S_t.copy()]
-
-#     for step in range(max_steps):
-#         print(f"\nEpoch {step+1}/{max_steps}:")
-
-#         # 2) Candidato para cada acción
-#         novelties, candidates = [], []
-#         for a in actions:
-#             x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
-#             S_pred = world_model.predict(x, verbose=0)[0]
-#             candidates.append((a, S_pred))
-#             nov = novelty(S_pred, np.vstack(memory), n)
-#             novelties.append(nov)
-#             print(nov)
-
-#         # 3) Escoger más novedoso
-#         best_idx = int(np.argmax(novelties))
-#         best_action, best_pred = candidates[best_idx]
-
-#         # 4) ¿Meta predicha?
-#         if best_pred[1] < goal_thresh:  # usamos red_dist = índice 1
-#             print(f"Meta predicha con acción {best_action}")
-#             memory.append(best_pred.copy())
-#             break
-
-#         # 5) Ejecutar en robot
-#         S_t1 = perform_main_action(robot, sim, best_action, duration=0.5)
-#         if not undo_if_needed(robot, best_action): 
-#             memory.append(S_t1)
-#             S_t = S_t1
-
-#         # 7) ¿Meta real?
-#         if S_t[1] < goal_thresh:
-#             print(f"Meta real alcanzada en paso {step}")
-#             break
-
-#     return memory
 
 def intrinsic_exploration_loop(robot, sim, world_model, actions,
-                               n: float = 1.0,
+                               n: float = 2.0,
                                max_steps: int = 100,
                                goal_thresh: float = 250.0):
     """
@@ -169,6 +123,8 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
                 memory.append(S_t1)
                 S_t = S_t1
                 break
+
+        print(S_t)
 
         # Comprobar si el estado actual es meta
         if S_t[1] < goal_thresh:

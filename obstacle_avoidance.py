@@ -1,7 +1,7 @@
 from robobopy.utils.IR import IR
 
 
-def needs_avoidance(robot, threshold=12):
+def needs_avoidance(robot, threshold=30):
     front_sensors = [IR.FrontC, IR.FrontLL, IR.FrontRR]
     for s in front_sensors:
         if (robot.readIRSensor(s) or 0) > threshold:

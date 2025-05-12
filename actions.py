@@ -65,7 +65,33 @@ def perform_simple_action(robot, angle, duration=1.0):
     robot.moveWheelsByTime(forward_speed, forward_speed, duration)
     robot.wait(0.5)
     return angle
-    
+
+
+def perform_random_action(robot, power=20, min_duration=2, max_duration=3):
+
+    """
+    Ejecuta una acción aleatoria: potencia continua en cada rueda.
+    - max_power: potencia máxima en cada rueda (en el rango [-max_power, +max_power]).
+    - min_duration, max_duration: duración de la acción (en segundos).
+    """
+    spin_speed = power
+    forward_speed = power
+
+    turn_angle = random.randint(-180, 180)
+    turn_duration = random.uniform(min_duration, max_duration)
+    turn_duration = abs(turn_angle) / 180.0 * 1.75
+
+    forward_duration = random.uniform(min_duration, max_duration)
+
+    if turn_angle > 0:
+        robot.moveWheelsByTime(-spin_speed, spin_speed, turn_duration)
+    elif turn_angle < 0:
+        robot.moveWheelsByTime(spin_speed, -spin_speed, turn_duration)
+
+    robot.moveWheelsByTime(forward_speed, forward_speed, forward_duration)
+    robot.wait(0.1)
+
+
 def perform_continuous_action(robot, left_power, right_power, duration=1.0):
     """
     Ejecuta una acción compleja: potencia continua en cada rueda.
