@@ -126,6 +126,87 @@ def _print_split_mse(y_true, y_pred, label=""):
     mse_positions= mean_squared_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
     print(f"{label} → MSE Ángulos: {mse_angles:.4f}, MSE Posiciones: {mse_positions:.4f}")
 
+def train_position_model(csv_path, save_path="position_model.keras"):
+    """
+    Entrena un modelo que, dado:
+      - red_rotation_t, red_position_t,
+      - green_position_t, blue_position_t,
+      - action
+    predice solo las posiciones futuras:
+      - red_position_t1, green_position_t1, blue_position_t1
+    """
+    # 1) Carga y selección de columnas
+    df = pd.read_csv(csv_path)
+    df["action"] = df["action"] / 90.0
+    
+    feature_cols = [
+        "red_rotation_t",
+        "red_position_t",
+        "green_position_t",
+        "blue_position_t",
+        "action"
+    ]
+    target_cols = [
+        "red_position_t1",
+        "green_position_t1",
+        "blue_position_t1"
+    ]
+    
+    X = df[feature_cols].values.astype(np.float32)
+    y = df[target_cols].values.astype(np.float32)
+    
+    # 2) Split train/test 80/20
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+    
+    # 3) Baseline: P_pos(t+1) = P_pos(t)
+    baseline_pred = X_test[:, [1, 2, 3]]  # red_pos_t, green_pos_t, blue_pos_t
+    baseline_mse = mean_squared_error(y_test, baseline_pred)
+    print(f"Baseline Position MSE: {baseline_mse:.4f}")
+    
+    # 4) Escalado de entradas
+    scaler = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s  = scaler.transform(X_test)
+    
+    # 5) Definición de la red
+    n_feats = X_train_s.shape[1]
+    n_outs  = y_train.shape[1]
+    model = Sequential([
+        Input(shape=(n_feats,)),
+        Dense(128, activation='relu'),
+        Dense(64, activation='relu'),
+        Dense(32, activation='relu'),
+        Dense(n_outs, activation='linear')
+    ])
+    model.compile(optimizer='adam', loss='mse')
+    
+    # 6) EarlyStopping
+    es = EarlyStopping(monitor='val_loss', patience=300, restore_best_weights=True)
+    
+    # 7) Entrenamiento
+    model.fit(
+        X_train_s, y_train,
+        validation_split=0.1,
+        epochs=1500,
+        batch_size=64,
+        callbacks=[es],
+        verbose=0
+    )
+    
+    # 8) Evaluación
+    y_pred = model.predict(X_test_s)
+    pos_mse = mean_squared_error(y_test, y_pred)
+    print(f"Trained Model Position MSE: {pos_mse:.4f}")
+    
+    # 9) Guardar modelo
+    model.save(save_path)
+    print(f"Modelo guardado en '{save_path}'")
+    
+    return model
+
+
 
 def train_mlp_model_tf(csv_path):
     X_train, X_test, y_train, y_test = _load_and_split(csv_path)
@@ -176,12 +257,11 @@ def train_deep_model_tf(csv_path):
     model.fit(
         X_train, y_train,
         validation_split=0.1,
-        epochs=500,
-        batch_size=32,
-        callbacks=[es],
+        epochs=1500,
+        batch_size=64,
         verbose=0
     )
-
+    model.save("deep_model_profe.keras")
     y_pred = model.predict(X_test, verbose=0)
     _print_split_mse(y_test, y_pred, label="[Deep TF]")
 
