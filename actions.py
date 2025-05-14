@@ -9,7 +9,7 @@ AVOID_THRESHOLD = 15      # valor IR a partir del cual hay obstáculo
 from perceptions import get_simple_perceptions
 import numpy as np
 
-def perform_main_action(robot, sim, angle, duration=1.0):
+def perform_main_action(robot, sim, angle, duration=0.5):
     """
     Ejecuta SOLO el giro + avance (tu acción cognitiva) y devuelve
     el estado medido justo después de esa maniobra, antes de cualquier evitado.
@@ -25,6 +25,12 @@ def perform_main_action(robot, sim, angle, duration=1.0):
     # 2) Avanzar recto
     robot.moveWheelsByTime(forward_speed, forward_speed, duration)
     robot.wait(0.1)
+    
+    # 4) Ejecutar evitado si es necesario, pero sin volver a leer
+    if go_back_if_needed(robot, angle, duration):
+        robot.wait(0.1)
+        return None
+    
     # 3) Leer percepción justo tras la maniobra principal
     P = get_simple_perceptions(sim)
     S_main = np.array([
@@ -32,16 +38,14 @@ def perform_main_action(robot, sim, angle, duration=1.0):
         P['green_rotation'],P['green_position'],
         P['blue_rotation'], P['blue_position']
     ], dtype=np.float32)
-    # 4) Ejecutar evitado si es necesario, pero sin volver a leer
-    if avoid_if_needed(robot):
-        robot.wait(0.1)
+    
     # 5) Devolver estado tras la acción cognitiva
     return S_main
 
 
 
 
-def perform_simple_action(robot, angle, duration=1.0):
+def perform_simple_action(robot, angle, duration=0.5):
     # tu diccionario ACCIONES de antes
     spin_speed = 20
     forward_speed = 20
@@ -129,5 +133,44 @@ def avoid_if_needed(robot, threshold=12):
     # Ejecutar giro sobre sí mismo
     robot.moveWheelsByTime(20, -20, duration)
     robot.moveWheelsByTime(20, 20, 1.5)
+    robot.wait(0.2)
+    return True
+
+def go_back_if_needed(robot, angle, duration, threshold=12):
+    """
+    Si un sensor detecta un obstáculo tras perform_main_action,
+    retrocede el mismo tiempo que avanzó (duration) y gira en sentido
+    contrario el mismo tiempo que giró (t_turn).
+    Devuelve True si se ejecutó la maniobra de retroceso, False en caso contrario.
+    """
+    from robobopy.utils.IR import IR
+
+    # Leer solo sensores frontales
+    front_sensors = [IR.FrontC, IR.FrontLL, IR.FrontRR]
+    readings = {s: robot.readIRSensor(s) or 0 for s in front_sensors}
+
+    # Filtrar sensores sobre umbral
+    detected = {s: v for s, v in readings.items() if v > threshold}
+    if not detected:
+        return False
+
+    # Maniobra de retroceso
+    spin_speed = 20
+    forward_speed = 20
+
+    # 1) Retroceder mismo tiempo que avanzó
+    robot.moveWheelsByTime(-forward_speed, -forward_speed, duration)
+    robot.wait(0.1)
+
+    # 2) Girar en sentido contrario
+    t_turn = abs(angle) / 180.0 * 1.75
+    if angle > 0:
+        # para deshacer giro positivo, invertimos signos
+        robot.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
+    elif angle < 0:
+        # para deshacer giro negativo
+        robot.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
+    # angle == 0: sin giro, no hace nada
+
     robot.wait(0.2)
     return True
