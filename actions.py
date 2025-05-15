@@ -37,10 +37,12 @@ def perform_main_action(robot, sim, angle, duration=0.5):
         P['blue_rotation'], P['blue_position']
     ], dtype=np.float32)
 
+    loc = sim.getRobotLocation(0)["position"]
+    
     # 4) Ver si hay que retroceder
     evaded = go_back_if_needed(robot, angle, duration)
     robot.wait(0.1)
-    return S_main, evaded
+    return S_main, evaded, loc
 
 
 

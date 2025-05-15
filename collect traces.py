@@ -1,9 +1,9 @@
 # from tensorflow.keras.models import load_model
 from keras.models import load_model
-from utility_utils import intrinsic_exploration_loop, intrinsic_exploration_loop2, intrinsic_exploration_loop_posrot, intrinsic_exploration_loop3, intrinsic_exploration_loop4, intrinsic_exploration_loop5
+from utility_utils import intrinsic_exploration_loop, intrinsic_exploration_loop2, intrinsic_exploration_loop_posrot, intrinsic_exploration_loop3, intrinsic_exploration_loop4, intrinsic_exploration_loop5, intrinsic_exploration_loop6
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
-import pickle, random
+import pickle, random, csv
 
 sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
 rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
@@ -12,6 +12,9 @@ rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 actions   = [-90, -45, 0, 45, 90]
 all_traces = []
 episodes  = 20
+import csv
+
+all_logs   = []
 
 # 1) Carga tu modelo del mundo
 # world_model = load_model("models/96.keras")
@@ -65,24 +68,40 @@ for ep in range(episodes):
     rob.moveWheelsByTime(forward_speed, forward_speed, rand_duration)
     rob.wait(0.1)
     # — fin pre-movimiento —
-    trace = intrinsic_exploration_loop4(
+    trace, log = intrinsic_exploration_loop6(
         rob, sim, world_model2,
         actions=actions,
         n=3.0,
         max_steps=150,
         goal_thresh=350.0
     )
-    all_traces.append(trace)
+    if trace is None:
+        print("No se ha detectado meta en el episodio")
+    else:
+        all_traces.append(trace)
     # reinicia simulador/robot aquí si hace falta
+    
+    for row in log:
+        row["episode"] = ep+1
+    all_logs.extend(log)
+    
     sim.resetSimulation()
     sim.wait(3)
     rob.moveTiltTo(110,20)
     rob.moveTiltTo(90,20)
 
 # al final de collect_traces.py, tras llenar all_traces:
-with open("models/all_traces_114_4.pkl", "wb") as f:
+with open("models/all_traces_114_v3_30.pkl", "wb") as f:
     pickle.dump(all_traces, f)
 print("Trazas guardadas")
+
+# Guardar CSV
+with open("datasets/positions_log2.csv","w",newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
+    writer.writeheader()
+    writer.writerows(all_logs)
+
+print("CSV volcadas en positions_log.csv")
 
 sim.disconnect()
 rob.disconnect()

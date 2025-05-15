@@ -53,7 +53,7 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
 def novelty(candidate: np.ndarray,
             memory: np.ndarray,
             n: float = 1.0) -> float:
-    diffs = memory[-10:] - candidate[np.newaxis, :]
+    diffs = memory[-30:] - candidate[np.newaxis, :]
     dists = np.linalg.norm(diffs, axis=1)
     return np.mean(dists ** n)
 
@@ -364,7 +364,8 @@ def intrinsic_exploration_loop5(robot, sim, world_model, actions,
     ], dtype=np.float32)
     # memoria solo de posiciones [red_pos, green_pos, blue_pos]
     memory = [S_t[[1,3,5]].copy()]
-
+    log = []
+    
     for step in range(max_steps):
         # 2) Predicciones
         preds = []
@@ -379,7 +380,7 @@ def intrinsic_exploration_loop5(robot, sim, world_model, actions,
             best_action, best_pred = min(goals, key=lambda t: t[1][1])
             print(f"Meta predicha con acción {best_action}")
             memory.append(best_pred[[1,3,5]].copy())
-            S_main, ev = perform_main_action(robot, sim, best_action)
+            S_main, ev, loc = perform_main_action(robot, sim, best_action)
             if not ev and S_main[1] < goal_thresh:
                 print(f"Meta real alcanzada en paso {step}")
             break
@@ -396,10 +397,17 @@ def intrinsic_exploration_loop5(robot, sim, world_model, actions,
         # 5) Top-5 con registro de retrocesos
         new_pos = None
         for score, act, _ in novs[:5]:
-            S_main, ev = perform_main_action(robot, sim, act)
+            S_main, ev, loc = perform_main_action(robot, sim, act)
             sim.wait(0.1); robot.wait(0.1)
 
             if ev:
+                # Logueamos la posición previa al retroceso
+                log.append({
+                    "step":   step,
+                    "x":      loc["x"],
+                    "y":      loc["y"],
+                    "evaded": True
+                })
                 pos_back = S_main[[1,3,5]].copy()
                 memory.append(pos_back)
                 continue
@@ -407,13 +415,20 @@ def intrinsic_exploration_loop5(robot, sim, world_model, actions,
             # aceptamos esta nueva percepción
             S_t = S_main
             new_pos = S_t[[1,3,5]].copy()
+            # Podemos también loguear las transiciones exitosas:
+            log.append({
+                "step":   step,
+                "x":      loc["x"],
+                "y":      loc["y"],
+                "evaded": False
+            })
             break
 
         if new_pos is None:
             print(f"No hay acción válida en paso {step}, dando marcha atrás.")
             robot.moveWheelsByTime(-20, -20, 1.0)
             continue
-
+    
         # 6) Guardar y seguir
         memory.append(new_pos)
 
@@ -422,7 +437,103 @@ def intrinsic_exploration_loop5(robot, sim, world_model, actions,
             print(f"Meta real alcanzada en paso {step}")
             break
 
-    return memory
+    return memory, log
+
+def intrinsic_exploration_loop6(robot, sim, world_model, actions,
+                                n: float = 1.0,
+                                max_steps: int = 100,
+                                goal_thresh: float = 250.0):
+    """
+    Variante de loop2 que, además, devuelve un `log` de posiciones
+    pre-retroceso para todas las acciones que envían a go_back_if_needed.
+    """
+    # 1) Estado inicial
+    P0 = get_simple_perceptions(sim)
+    S_t = np.array([
+        P0['red_rotation'],  P0['red_position'],
+        P0['green_rotation'],P0['green_position'],
+        P0['blue_rotation'], P0['blue_position']
+    ], dtype=np.float32)
+    memory = [S_t.copy()]
+
+    # Aquí acumularemos los logs: paso, x, y, si evadió
+    log = []
+
+    for step in range(max_steps):
+        # 2) Predicciones
+        preds = []
+        for a in actions:
+            x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
+            S_pred = world_model.predict(x, verbose=0)[0]
+            preds.append((a, S_pred))
+
+        # 3) ¿Alguna predicción alcanza la meta?
+        goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
+        if goals:
+            best_action, best_pred = min(goals, key=lambda t: t[1][1])
+            print(f"Meta predicha con acción {best_action}")
+            memory.append(best_pred.copy())
+            S_main, ev, loc = perform_main_action(robot, sim, best_action)
+            # si evadió, no revisamos meta real (se quedó en retroceso)
+            if not ev and S_main[1] < goal_thresh:
+                print(f"Meta real alcanzada en paso {step}")
+            break
+
+        # 4) Novedad
+        novs = [(novelty(S_pred, np.vstack(memory), n), a, S_pred)
+                for a, S_pred in preds]
+        novs.sort(key=lambda t: t[0], reverse=True)
+
+        # 5) Top-5 intentos, con logging de pre-retroceso
+        S_t1 = None
+        for score, act, _ in novs[:5]:
+            S_main, ev, loc = perform_main_action(robot, sim, act)
+            sim.wait(0.1); robot.wait(0.1)
+
+            if ev:
+                # Logueamos la posición previa al retroceso
+                log.append({
+                    "step":   step,
+                    "x":      loc["x"],
+                    "z":      loc["z"],
+                    "evaded": True
+                })
+                # Añadimos a memory para penalizar esa zona y seguimos
+                memory.append(S_main.copy())
+                continue
+
+            # Si no evadió, aceptamos ese nuevo estado
+            S_t1 = S_main
+            # Podemos también loguear las transiciones exitosas:
+            log.append({
+                "step":   step,
+                "x":      loc["x"],
+                "z":      loc["z"],
+                "evaded": False
+            })
+            break
+
+        if S_t1 is None:
+            print(f"No hay acción válida en paso {step}, dando marcha atrás.")
+            robot.moveWheelsByTime(-20, -20, 1.0)
+            continue
+
+        # 6) Actualizar memoria y estado
+        memory.append(S_t1.copy())
+        S_t = S_t1
+
+        # 7) Comprobar meta real
+        if S_t[1] < goal_thresh:
+            print(f"Meta real alcanzada en paso {step}")
+            break
+        
+        if step == max_steps - 1:
+            print("No se ha alcanzado la meta, no añadir este episodio a las trazas")
+            memory = None
+            break
+
+    # Al final, devolvemos tanto la memoria como el log de posiciones
+    return memory, log
 
 def intrinsic_exploration_loop_posrot(robot, sim, world_model, actions,
                                       n: float = 1.0,
