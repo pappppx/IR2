@@ -53,7 +53,7 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
 def novelty(candidate: np.ndarray,
             memory: np.ndarray,
             n: float = 1.0) -> float:
-    diffs = memory - candidate[np.newaxis, :]
+    diffs = memory[-10:] - candidate[np.newaxis, :]
     dists = np.linalg.norm(diffs, axis=1)
     return np.mean(dists ** n)
 
@@ -188,6 +188,241 @@ def intrinsic_exploration_loop2(robot, sim, world_model, actions,
 
     return memory
 
+def intrinsic_exploration_loop3(robot, sim, world_model, actions,
+                                n: float = 1.0,
+                                max_steps: int = 100,
+                                goal_thresh: float = 250.0):
+    """
+    Igual que intrinsic_exploration_loop2, pero:
+      - La memoria sólo almacena posiciones [red_pos, green_pos, blue_pos].
+      - La función de novedad actúa sobre ℝ³ de posiciones.
+      - El world_model recibe como input rotaciones + posiciones.
+    """
+    # 1) Estado inicial completo
+    P0 = get_simple_perceptions(sim)
+    S_t = np.array([
+        P0['red_rotation'],  P0['red_position'],
+        P0['green_rotation'],P0['green_position'],
+        P0['blue_rotation'], P0['blue_position']
+    ], dtype=np.float32)  # shape (6,)
+
+    # Memoria: sólo posiciones (índices 1, 3, 5)
+    memory = [S_t[[1, 3, 5]].copy()]  # lista de arrays de shape (3,)
+
+    for step in range(max_steps):
+        # 2) Predecir todos los candidatos
+        preds = []
+        for a in actions:
+            x = np.hstack([S_t, a/90.0]).astype(np.float32)[None, :]  # (1, 6 + acción)
+            S_pred = world_model.predict(x)[0]  # (6,)
+            preds.append((a, S_pred))
+
+        # 3) ¿Alguna predicción alcanza la meta?
+        # Usamos S_pred[1] = red_position
+        goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
+        if goals:
+            # Elegir la que deja menor distancia al rojo
+            best_action, best_pred = min(goals, key=lambda t: t[1][1])
+            print(f"Meta predicha con acción {best_action}")
+            # Guardar la posición predicha
+            memory.append(best_pred[[1, 3, 5]].copy())
+            # Ejecutar y salir
+            S_t1 = perform_main_action(robot, sim, best_action, duration=0.5)
+            if S_t1[1] < goal_thresh:
+                print(f"Meta real alcanzada en paso {step}")
+            break
+
+        # 4) Calcular novedad en ℝ³
+        M = np.vstack(memory)  # (m, 3)
+        novs = []
+        for a, S_pred in preds:
+            pos_pred = S_pred[[1, 3, 5]]
+            dists = np.linalg.norm(M - pos_pred[None, :], axis=1)
+            nov_score = np.mean(dists ** n)
+            novs.append((nov_score, a, S_pred))
+        novs.sort(key=lambda t: t[0], reverse=True)
+
+        # 5) Intentar las top-5 más novedosas
+        S_t1 = None
+        for _, act, _ in novs[:5]:
+            S_full = perform_main_action(robot, sim, act, duration=0.5)
+            sim.wait(0.1); robot.wait(0.1)
+            if S_full is not None:
+                S_t1 = S_full
+                break
+
+        if S_t1 is None:
+            print(f"No hay acción válida en paso {step}, abortando.")
+            break
+
+        # 6) Actualizar estado y memoria
+        S_t = S_t1
+        memory.append(S_t[[1, 3, 5]].copy())
+
+        # 7) Comprobar meta real
+        if S_t[1] < goal_thresh:
+            print(f"Meta real alcanzada en paso {step}")
+            break
+
+    return memory
+
+def intrinsic_exploration_loop4(robot, sim, world_model, actions,
+                                n: float = 1.0,
+                                max_steps: int = 100,
+                                goal_thresh: float = 250.0):
+    """
+    Igual a loop2, pero al probar cada top-5 acción:
+      - Si evaded=True, añade S_main a memory y sigue.
+      - Si evaded=False, acepta S_main, sale del bucle y continúa.
+    """
+    from perceptions import get_simple_perceptions
+
+    # 1) Estado inicial
+    P0 = get_simple_perceptions(sim)
+    S_t = np.array([
+        P0['red_rotation'],  P0['red_position'],
+        P0['green_rotation'],P0['green_position'],
+        P0['blue_rotation'], P0['blue_position']
+    ], dtype=np.float32)
+    memory = [S_t.copy()]
+
+    for step in range(max_steps):
+        # 2) Predicciones
+        preds = []
+        for a in actions:
+            x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
+            S_pred = world_model.predict(x)[0]
+            preds.append((a, S_pred))
+
+        # 3) Meta predicha?
+        goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
+        if goals:
+            best_action, best_pred = min(goals, key=lambda t: t[1][1])
+            print(f"Meta predicha con acción {best_action}")
+            memory.append(best_pred.copy())
+            S_main, ev = perform_main_action(robot, sim, best_action)
+            if not ev and S_main[1] < goal_thresh:
+                print(f"Meta real alcanzada en paso {step}")
+            break
+
+        # 4) Novedad
+        novs = [(novelty(S_pred, np.vstack(memory), n), a, S_pred)
+                for a, S_pred in preds]
+        novs.sort(key=lambda t: t[0], reverse=True)
+
+        # 5) Top-5 intentos
+        S_t1 = None
+        for score, act, _ in novs[:5]:
+            S_main, ev = perform_main_action(robot, sim, act)
+            sim.wait(0.1); robot.wait(0.1)
+
+            if ev:
+                # añadir la posición previa al retroceso
+                memory.append(S_main.copy())
+                continue
+
+            # si no evadió, aceptamos esa transición
+            S_t1 = S_main
+            chosen = act
+            break
+
+        if S_t1 is None:
+            print(f"No hay acción válida en paso {step}, dando marcha atrás.")
+            robot.moveWheelsByTime(-20, -20, 1.0)
+            continue
+
+        # 6) Actualizar
+        memory.append(S_t1.copy())
+        S_t = S_t1
+
+        # 7) Meta real
+        if S_t[1] < goal_thresh:
+            print(f"Meta real alcanzada en paso {step}")
+            break
+
+    return memory
+
+
+# ——— intrinsic_exploration_loop5 ———
+def intrinsic_exploration_loop5(robot, sim, world_model, actions,
+                                n: float = 1.0,
+                                max_steps: int = 100,
+                                goal_thresh: float = 250.0):
+    """
+    Igual a loop3, pero al probar cada top-5 acción:
+      - Si evaded=True, añade la POSICIÓN previa al retroceso a memory y sigue.
+      - Si evaded=False, acepta el nuevo estado y sale del bucle de intentos.
+    """
+    from perceptions import get_simple_perceptions
+
+    # 1) Estado inicial
+    P0 = get_simple_perceptions(sim)
+    S_t = np.array([
+        P0['red_rotation'],  P0['red_position'],
+        P0['green_rotation'],P0['green_position'],
+        P0['blue_rotation'], P0['blue_position']
+    ], dtype=np.float32)
+    # memoria solo de posiciones [red_pos, green_pos, blue_pos]
+    memory = [S_t[[1,3,5]].copy()]
+
+    for step in range(max_steps):
+        # 2) Predicciones
+        preds = []
+        for a in actions:
+            x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
+            S_pred = world_model.predict(x)[0]
+            preds.append((a, S_pred))
+
+        # 3) Meta predicha?
+        goals = [(a, p) for a, p in preds if p[1] < goal_thresh]
+        if goals:
+            best_action, best_pred = min(goals, key=lambda t: t[1][1])
+            print(f"Meta predicha con acción {best_action}")
+            memory.append(best_pred[[1,3,5]].copy())
+            S_main, ev = perform_main_action(robot, sim, best_action)
+            if not ev and S_main[1] < goal_thresh:
+                print(f"Meta real alcanzada en paso {step}")
+            break
+
+        # 4) Novedad en ℝ³
+        M = np.vstack(memory)
+        novs = []
+        for a, S_pred in preds:
+            pos = S_pred[[1,3,5]]
+            score = np.mean(np.linalg.norm(M - pos[None,:], axis=1)**n)
+            novs.append((score, a, S_pred))
+        novs.sort(key=lambda t: t[0], reverse=True)
+
+        # 5) Top-5 con registro de retrocesos
+        new_pos = None
+        for score, act, _ in novs[:5]:
+            S_main, ev = perform_main_action(robot, sim, act)
+            sim.wait(0.1); robot.wait(0.1)
+
+            if ev:
+                pos_back = S_main[[1,3,5]].copy()
+                memory.append(pos_back)
+                continue
+
+            # aceptamos esta nueva percepción
+            S_t = S_main
+            new_pos = S_t[[1,3,5]].copy()
+            break
+
+        if new_pos is None:
+            print(f"No hay acción válida en paso {step}, dando marcha atrás.")
+            robot.moveWheelsByTime(-20, -20, 1.0)
+            continue
+
+        # 6) Guardar y seguir
+        memory.append(new_pos)
+
+        # 7) Meta real
+        if new_pos[0] < goal_thresh:
+            print(f"Meta real alcanzada en paso {step}")
+            break
+
+    return memory
 
 def intrinsic_exploration_loop_posrot(robot, sim, world_model, actions,
                                       n: float = 1.0,
@@ -264,8 +499,9 @@ def intrinsic_exploration_loop_posrot(robot, sim, world_model, actions,
                     chosen = act
                     break
             if new_pos is None:
-                print(f"Paso {step}: ninguna acción válida, aborto.")
-                break
+                print(f"No hay acción válida en paso {step}, dando marcha atrás.")
+                robot.moveWheelsByTime(-20, -20, 1.0)
+                continue
 
             # 6) Guardar en memoria posiciones y continuar
             memory.append(new_pos)
