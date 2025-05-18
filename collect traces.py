@@ -3,105 +3,68 @@ from keras.models import load_model
 from utility_utils import intrinsic_exploration_loop, intrinsic_exploration_loop2, intrinsic_exploration_loop_posrot, intrinsic_exploration_loop3, intrinsic_exploration_loop4, intrinsic_exploration_loop5, intrinsic_exploration_loop6
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
+from actions import perform_random_action
 import pickle, random, csv
 
 sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
 rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
     
-# 2) Parámetros
-actions   = [-90, -45, 0, 45, 90]
-all_traces = []
-episodes  = 20
-import csv
+# Parámetros
+MAX_STEPS = 400
+ACTIONS = [-90, -45, 0, 45, 90]
+MEMORY_SIZE = [-5, -15, -20, -25, -30, -35, -40, -45]
+EPISODES = 20
+SPIN_SPEED = 20
+FORWARD_SPEED = 20
+N = 3.0
+GOAL_THRESH = 350.0
+MODEL_PATH = "114"
 
+model = load_model(f"models/{MODEL_PATH}.keras")
+all_traces = []
 all_logs   = []
 
-# 1) Carga tu modelo del mundo
-# world_model = load_model("models/96.keras")
+for M in MEMORY_SIZE:
+    print(f"\n=== Tamaño de memoria: {abs(M)} ===")
+    for ep in range(EPISODES):
+        print(f"\n=== Episodio {ep+1} ===")
 
-# for ep in range(episodes):
-#      print(f"\n=== Episodio {ep+1} ===")
-#      trace = intrinsic_exploration_loop_posrot(
-#          rob, sim, world_model,
-#          actions=actions,
-#          n=6.0,
-#          max_steps=100,
-#          goal_thresh=350.0
-#      )
-#      all_traces.append(trace)
-#      # reinicia simulador/robot aquí si hace falta
-#      sim.resetSimulation()
-#      sim.wait(3)
-#      rob.moveTiltTo(110,20)
-#      rob.moveTiltTo(90,20)
+        # Movimiento inicial aleatorio
+        perform_random_action(rob, SPIN_SPEED, FORWARD_SPEED)
 
-# # al final de collect_traces.py, tras llenar all_traces:
-# with open("models/all_traces_96_4.pkl", "wb") as f:
-#     pickle.dump(all_traces, f)
-# print("Trazas guardas.pkl")
+        trace, log = intrinsic_exploration_loop6(
+            rob,
+            sim,
+            model,
+            actions=ACTIONS,
+            n=N,
+            max_steps=MAX_STEPS,
+            goal_thresh=GOAL_THRESH
+        )
+        if trace is None:
+            print("No se ha detectado meta en el episodio")
+        else:
+            all_traces.append(trace)
+        
+        for row in log:
+            row["episode"] = ep+1
+        all_logs.extend(log)
+        
+        sim.resetSimulation()
+        sim.wait(3)
+        rob.moveTiltTo(110,20)
+        rob.moveTiltTo(90,20)
 
-world_model2 = load_model("models/114.keras")
-all_traces = []
-episodes  = 20
+    # Guardar trazas
+    with open(f"traces/traces_model_{MODEL_PATH}_M_{str(abs(M))}", "wb") as f:
+        pickle.dump(all_traces, f)
+    print("Trazas guardadas")
 
-spin_speed    = 20
-forward_speed = 20
-
-for ep in range(episodes):
-    print(f"\n=== Episodio {ep+1} ===")
-
-    # --- Pre-movimiento aleatorio ---
-    # Ángulo aleatorio en grados [-180, +180]
-    rand_angle = random.uniform(0.0, 360.0)
-    # Duración proporcional al ángulo (1.75 s equivale a 180°)
-    t_turn = abs(rand_angle) / 180.0 * 1.75
-
-    if rand_angle > 0:
-        rob.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
-    elif rand_angle < 0:
-        rob.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
-    # si rand_angle == 0, no gira
-    rob.wait(0.1)
-
-    # Avance aleatorio entre 0.5 y 1.5 segundos
-    rand_duration = random.uniform(0.5, 1.5)
-    rob.moveWheelsByTime(forward_speed, forward_speed, rand_duration)
-    rob.wait(0.1)
-    # — fin pre-movimiento —
-    trace, log = intrinsic_exploration_loop6(
-        rob, sim, world_model2,
-        actions=actions,
-        n=3.0,
-        max_steps=150,
-        goal_thresh=350.0
-    )
-    if trace is None:
-        print("No se ha detectado meta en el episodio")
-    else:
-        all_traces.append(trace)
-    # reinicia simulador/robot aquí si hace falta
-    
-    for row in log:
-        row["episode"] = ep+1
-    all_logs.extend(log)
-    
-    sim.resetSimulation()
-    sim.wait(3)
-    rob.moveTiltTo(110,20)
-    rob.moveTiltTo(90,20)
-
-# al final de collect_traces.py, tras llenar all_traces:
-with open("models/all_traces_114_v3_30.pkl", "wb") as f:
-    pickle.dump(all_traces, f)
-print("Trazas guardadas")
-
-# Guardar CSV
-with open("datasets/positions_log2.csv","w",newline="") as f:
-    writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
-    writer.writeheader()
-    writer.writerows(all_logs)
-
-print("CSV volcadas en positions_log.csv")
+    # Guardar posiciones
+    with open(f"positions/log_M_{str(abs(M))}.csv","w",newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
+        writer.writeheader()
+        writer.writerows(all_logs)
 
 sim.disconnect()
 rob.disconnect()

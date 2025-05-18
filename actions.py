@@ -45,6 +45,22 @@ def perform_main_action(robot, sim, angle, duration=0.5):
     return S_main, evaded, loc
 
 
+def perform_random_action(rob, spin_speed=20, forward_speed=20):
+
+    rand_angle = random.uniform(0.0, 360.0)
+    t_turn = abs(rand_angle) / 180.0 * 1.75
+
+    if rand_angle > 0:
+        rob.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
+    elif rand_angle < 0:
+        rob.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
+
+    rob.wait(0.1)
+
+    # Avance aleatorio entre 0.5 y 1.5 segundos
+    rand_duration = random.uniform(0.5, 2.5)
+    rob.moveWheelsByTime(forward_speed, forward_speed, rand_duration)
+    rob.wait(0.1)
 
 
 def perform_simple_action(robot, angle, duration=0.5):

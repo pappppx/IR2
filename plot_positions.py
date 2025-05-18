@@ -55,7 +55,7 @@ def plot_position_scatter(csv_path,
     else:
         plt.show()
 
-plot_position_scatter('datasets/positions_log2.csv')
+plot_position_scatter('positions/log_M-5.csv')
 
 # Scatter solo del episodio 5
 # plot_position_scatter('datasets/positions_log.csv', episode=5)
