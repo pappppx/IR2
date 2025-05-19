@@ -11,7 +11,7 @@ def main():
     # Entrenamiento del Utility Model
     train_utility_model(
         traces=all_traces,
-        window=20,
+        window=10,
         save_path="models/utility/utility_model.keras"
     )
 

@@ -11,7 +11,7 @@ def prepare_utility_dataset(traces, window=10):
     for trace in traces:
         k = min(window, len(trace))
         for i in range(k):
-            S = trace[-(i+1)]      # último, penúltimo, …
+            S = trace[-(i+1)]
             utility = float(i+1) / k
             X.append(S)
             y.append(utility)
@@ -23,10 +23,12 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
         X, y, test_size=0.2, random_state=42
     )
 
+    print(y_train)
+
     model = Sequential([
         Input(shape=(6,)),
         Dense(64, activation='relu'),
-        Dense(32, activation='relu'),
+        Dense(64, activation='relu'),
         Dense(1,  activation='linear')
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -34,7 +36,7 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
 
     model.fit(
         X_train, y_train,
-        validation_split=0.1,
+        validation_split=0.2,
         epochs=200,
         batch_size=32,
         callbacks=[es],
