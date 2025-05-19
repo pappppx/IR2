@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.callbacks import EarlyStopping
 
 def prepare_utility_dataset(traces, window=10):
@@ -24,7 +24,8 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
     )
 
     model = Sequential([
-        Dense(64, activation='relu', input_shape=(6,)),
+        Input(shape=(6,)),
+        Dense(64, activation='relu'),
         Dense(32, activation='relu'),
         Dense(1,  activation='linear')
     ])

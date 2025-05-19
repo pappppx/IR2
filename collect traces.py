@@ -6,9 +6,11 @@ from robobopy.Robobo import Robobo
 from actions import perform_random_action
 import pickle, random, csv
 
-sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
-rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
-    
+# Directorios
+MODEL_PATH = "models/"
+POSITIONS_PATH = "positions/"
+TRACES_PATH = "traces/"
+
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
@@ -18,9 +20,11 @@ SPIN_SPEED = 20
 FORWARD_SPEED = 20
 N = 3.0
 GOAL_THRESH = 350.0
-MODEL_PATH = "114"
 
-model = load_model(f"models/{MODEL_PATH}.keras")
+sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
+rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
+    
+model = load_model(f"{MODEL_PATH}114.keras")
 all_traces = []
 all_logs   = []
 
@@ -56,12 +60,11 @@ for M in MEMORY_SIZE:
         rob.moveTiltTo(90,20)
 
     # Guardar trazas
-    with open(f"traces/traces_model_{MODEL_PATH}_M_{str(abs(M))}", "wb") as f:
+    with open(f"{TRACES_PATH}traces_model_{MODEL_PATH}_M_{str(abs(M))}.pkl", "wb") as f:
         pickle.dump(all_traces, f)
-    print("Trazas guardadas")
 
     # Guardar posiciones
-    with open(f"positions/log_M_{str(abs(M))}.csv","w",newline="") as f:
+    with open(f"{POSITIONS_PATH}log_M_{str(abs(M))}.csv","w",newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
         writer.writeheader()
         writer.writerows(all_logs)
