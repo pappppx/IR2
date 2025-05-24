@@ -207,7 +207,6 @@ def train_position_model(csv_path, save_path="position_model.keras"):
     return model
 
 
-
 def train_mlp_model_tf(csv_path):
     X_train, X_test, y_train, y_test = _load_and_split(csv_path)
 

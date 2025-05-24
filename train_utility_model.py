@@ -11,8 +11,8 @@ def main():
     # Entrenamiento del Utility Model
     train_utility_model(
         traces=all_traces,
-        window=10,
-        save_path="models/utility/utility_model.keras"
+        window=20,
+        save_path="models/utility/utility_model3.keras"
     )
 
 if __name__ == "__main__":

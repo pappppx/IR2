@@ -1,7 +1,6 @@
 from keras.models import load_model
 import numpy as np
 from perceptions import get_simple_perceptions
-from utility_utils import intrinsic_exploration_loop, intrinsic_exploration_loop2, intrinsic_exploration_loop_posrot, intrinsic_exploration_loop3, intrinsic_exploration_loop4, intrinsic_exploration_loop5, intrinsic_exploration_loop6
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
 from actions import perform_main_action, perform_random_action
@@ -76,7 +75,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 
-    utility_model = load_model("models/utility/utility_model.keras")
+    utility_model = load_model("models/utility/utility_model3.keras")
     world_model = load_model("models/world/114.keras")
 
     n_moves = []
