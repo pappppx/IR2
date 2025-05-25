@@ -49,6 +49,8 @@ def test_model(
         # Sort utility predictions by score (highest first)
         utility_model_predictions.sort(key=lambda x: x[0], reverse=True)
 
+        # print(f"Paso {step}: Predicciones de utilidad: {[u[0] for u in utility_model_predictions]}")
+
         for utility_score, action, S_pred in utility_model_predictions:
             
             S_main, evade, _ = perform_main_action(robot, sim, action)

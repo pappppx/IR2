@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.multioutput import MultiOutputRegressor
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
@@ -122,9 +122,28 @@ def _load_and_split(csv_path, test_frac=0.2, seed=42):
     return train_test_split(X, y, test_size=test_frac, random_state=seed)
 
 def _print_split_mse(y_true, y_pred, label=""):
-    mse_angles   = mean_squared_error(y_true[:, ANGLE_COLS], y_pred[:, ANGLE_COLS])
-    mse_positions= mean_squared_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
-    print(f"{label} → MSE Ángulos: {mse_angles:.4f}, MSE Posiciones: {mse_positions:.4f}")
+    total_mse      = mean_squared_error(y_true, y_pred)
+    mse_angles     = mean_squared_error(y_true[:, ANGLE_COLS], y_pred[:, ANGLE_COLS])
+    mse_positions  = mean_squared_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
+    
+    print(
+        f"{label} → "
+        f"MSE total:     {total_mse: .4f},  "
+        f"MSE ángulos:   {mse_angles: .4f},  "
+        f"MSE posiciones:{mse_positions: .4f}"
+    )
+
+def _print_split_mae(y_true, y_pred, label=""):
+    total_mae      = mean_absolute_error(y_true, y_pred)
+    mae_angles     = mean_absolute_error(y_true[:, ANGLE_COLS], y_pred[:, ANGLE_COLS])
+    mae_positions  = mean_absolute_error(y_true[:, POS_COLS],   y_pred[:, POS_COLS])
+    
+    print(
+        f"{label} → "
+        f"MAE total:     {total_mae: .4f},  "
+        f"MAE ángulos:   {mae_angles: .4f},  "
+        f"MAE posiciones:{mae_positions: .4f}"
+    )
 
 def train_position_model(csv_path, save_path="position_model.keras"):
     """
@@ -228,12 +247,12 @@ def train_mlp_model_tf(csv_path):
         validation_split=0.1,
         epochs=500,
         batch_size=32,
-        callbacks=[es],
-        verbose=0
+        callbacks=[es]
     )
 
     y_pred = model.predict(X_test, verbose=0)
     _print_split_mse(y_test, y_pred, label="[MLP TF]")
+    _print_split_mae(y_test, y_pred, label="[MLP TF]")
 
 
 def train_deep_model_tf(csv_path):

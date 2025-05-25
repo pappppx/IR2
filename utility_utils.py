@@ -45,20 +45,20 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
 
     model = Sequential([
         Input(shape=(6,)),
-        Dense(64, activation='relu'),
+        Dense(16, activation='relu'),
         Dropout(0.2),
-        Dense(64, activation='relu'),
+        Dense(16, activation='relu'),
         Dropout(0.2),
         Dense(1, activation='linear')
     ])
     model.compile(optimizer='adam', loss='mse')
-    es = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
 
     history = model.fit(
         X_train, y_train,
         validation_split=0.2,
         epochs=200,
-        batch_size=32,
+        batch_size=4,
         callbacks=[es],
         verbose=1
     )
@@ -76,8 +76,13 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
 
 def novelty(candidate: np.ndarray,
             memory: np.ndarray,
-            n: float = 1.0) -> float:
-    diffs = memory[-30:] - candidate[np.newaxis, :]
+            n: float = 1.0,
+            m: int = 10) -> float:
+    
+    # print(f"\nmemory: {memory[-m:]}\n")
+    # print(f"candidate: {candidate}\n")
+    diffs = memory[-m:] - candidate[np.newaxis, :]
+    # print(f"diffs: {diffs}\n")
     dists = np.linalg.norm(diffs, axis=1)
     return np.mean(dists ** n)
 
@@ -124,9 +129,11 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             break
 
         # 4) Novedad
-        novs = [(novelty(S_pred, np.vstack(memory), n), a, S_pred)
-                for a, S_pred in preds]
+        novs = [(novelty(S_pred, np.vstack(memory), n, m), a, S_pred) for a, S_pred in preds]
         novs.sort(key=lambda t: t[0], reverse=True)
+
+        # for nov in novs:
+        #     print(f"Paso {step}, Accion: {nov[1]} Novelty: {nov[0]}")
 
         # 5) Top-5 intentos, con logging de pre-retroceso
         S_t1 = None

@@ -2,9 +2,9 @@ from model_utils import train_simple_model, train_deep_model_tf, train_mlp_model
     
 def main():
     # train_simple_model("datasets/merge_05_31k.csv")
-    # train_mlp_model_tf("datasets/merge_05_31k.csv")
+    train_mlp_model_tf("datasets/merge_05_31k.csv")
     # train_deep_model_tf("datasets/merge_05_31k.csv")
-    train_position_model("datasets/dataset_05segundo_10k.csv")
+    # train_position_model("datasets/dataset_05segundo_10k.csv")
     # train_wide_and_deep_model_tf("datasets/merge_05_31k.csv")
     # print("Ahora el dataset transformado")
     # train_mlp_model_new("datasets/transformed_31k.csv")

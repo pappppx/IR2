@@ -7,14 +7,14 @@ from actions import perform_random_action
 import pickle, random, csv
 
 # Directorios
-MODEL_PATH = "models/"
+WORLD_MODEL_PATH = "models/world/"
 POSITIONS_PATH = "positions/"
 TRACES_PATH = "traces/"
 
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
-MEMORY_SIZE = [-5, -15, -20, -25, -30, -35, -40, -45]
+MEMORY_SIZE = [5, 10]
 EPISODES = 20
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
@@ -25,7 +25,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
         
-    model = load_model(f"{MODEL_PATH}114.keras")
+    model = load_model(f"{WORLD_MODEL_PATH}114.keras")
     all_traces = []
     all_logs   = []
 
@@ -42,6 +42,7 @@ def main():
                 sim,
                 model,
                 actions=ACTIONS,
+                m=M,
                 n=N,
                 max_steps=MAX_STEPS,
                 goal_thresh=GOAL_THRESH
@@ -61,11 +62,11 @@ def main():
             rob.moveTiltTo(90,20)
 
         # Guardar trazas
-        with open(f"{TRACES_PATH}traces_model_{MODEL_PATH}_M_{str(abs(M))}.pkl", "wb") as f:
+        with open(f"{TRACES_PATH}traces_M_{str(M)}v2.pkl", "wb") as f:
             pickle.dump(all_traces, f)
 
         # Guardar posiciones
-        with open(f"{POSITIONS_PATH}log_M_{str(abs(M))}.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}v2.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)
