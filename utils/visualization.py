@@ -1,5 +1,19 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+
+def plot_training_history(history):
+
+    plt.figure()
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.yscale('log')
+    plt.title('Model Loss Over Epochs (Log Scale)')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss (Log Scale)')
+    plt.legend()
+    plt.grid(True, which="both", ls="--", linewidth=0.5)
+    plt.tight_layout()
+    plt.show()
 
 def plot_position_scatter(csv_path,
                           episode=None,
@@ -54,8 +68,3 @@ def plot_position_scatter(csv_path,
         print(f"Scatter guardado en '{scatter_path}'")
     else:
         plt.show()
-
-plot_position_scatter('positions/log_M_40v2.csv')
-
-# Scatter solo del episodio 5
-# plot_position_scatter('datasets/positions_log.csv', episode=5)

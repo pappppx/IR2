@@ -1,9 +1,9 @@
-from keras.models import load_model
 import numpy as np
-from perceptions import get_simple_perceptions
+from keras.models import load_model
+from utils.perceptions import get_perception_vector
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
-from actions import perform_main_action, perform_random_action
+from utils.actions import perform_main_action, perform_random_action
 
 # Directorios
 MODEL_PATH = "models/"
@@ -28,12 +28,7 @@ def test_model(
 
     for step in range(max_steps):
 
-        s_t0 = get_simple_perceptions(sim)
-        s_t0 = np.array([
-            s_t0['red_rotation'], s_t0['red_position'],
-            s_t0['green_rotation'], s_t0['green_position'],
-            s_t0['blue_rotation'], s_t0['blue_position']
-        ], dtype=np.float32)
+        s_t0 = get_perception_vector(sim)
 
         world_model_predictions = []
         for a in actions:
@@ -44,27 +39,24 @@ def test_model(
         utility_model_predictions = []
         for a, S_pred in world_model_predictions:
             utility_score = utility_model.predict(S_pred[None,:], verbose=0)[0]
-            utility_model_predictions.append((utility_score, a, S_pred))
+            utility_model_predictions.append({
+                'score': utility_score[0],
+                'action': a,
+                'S_pred': S_pred
+            })
 
         # Sort utility predictions by score (highest first)
-        utility_model_predictions.sort(key=lambda x: x[0], reverse=True)
+        utility_model_predictions.sort(key=lambda x: x["score"], reverse=True)
 
-        # print(f"Paso {step}: Predicciones de utilidad: {[u[0] for u in utility_model_predictions]}")
-
-        for utility_score, action, S_pred in utility_model_predictions:
+        for element in utility_model_predictions:
             
-            S_main, evade, _ = perform_main_action(robot, sim, action)
+            _, evade, _ = perform_main_action(robot, sim, element['action'])
             sim.wait(0.1); robot.wait(0.1)
 
             if evade: continue
             break
 
-        s_t1 = get_simple_perceptions(sim)
-        s_t1 = np.array([
-            s_t1['red_rotation'], s_t1['red_position'],
-            s_t1['green_rotation'], s_t1['green_position'],
-            s_t1['blue_rotation'], s_t1['blue_position']
-        ], dtype=np.float32)
+        s_t1 = get_perception_vector(sim)
 
         if s_t1[1] < goal_thresh:
             print(f"Meta real alcanzada en paso {step}")
@@ -77,7 +69,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 
-    utility_model = load_model("models/utility/utility_model3.keras")
+    utility_model = load_model("models/utility/utility_model4.keras")
     world_model = load_model("models/world/114.keras")
 
     n_moves = []

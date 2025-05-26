@@ -1,9 +1,9 @@
 # from tensorflow.keras.models import load_model
 from keras.models import load_model
-from utility_utils import intrinsic_exploration_loop
+from utils.utility import intrinsic_exploration_loop
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
-from actions import perform_random_action
+from utils.actions import perform_random_action
 import pickle, random, csv
 
 # Directorios
@@ -14,8 +14,8 @@ TRACES_PATH = "traces/"
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
-MEMORY_SIZE = [5, 10]
-EPISODES = 20
+MEMORY_SIZE = [30]
+EPISODES = 80
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
 N = 3.0
@@ -66,7 +66,7 @@ def main():
             pickle.dump(all_traces, f)
 
         # Guardar posiciones
-        with open(f"{POSITIONS_PATH}log_M_{str(M)}v2.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}v3.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)

@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense, Input, BatchNormalization, Dropout
+from tensorflow.keras.layers import Dense, Input, BatchNormalization, Dropout, Normalization
 from tensorflow.keras.callbacks import EarlyStopping
-from actions import perform_main_action
-from perceptions import get_simple_perceptions
+from utils.actions import perform_main_action
+from utils.perceptions import get_simple_perceptions
+from utils.visualization import plot_training_history
 
 
 def prepare_utility_dataset(traces, window=10):
@@ -16,40 +17,26 @@ def prepare_utility_dataset(traces, window=10):
         for i in range(k):
             S = trace[-(i+1)]
             utility = float(i+1) / k
+            
             X.append(S)
             y.append(utility)
+
     return np.vstack(X), np.array(y, dtype=np.float32)
 
 
-def plot_training_history(history):
-
-    plt.figure()
-    plt.plot(history.history['loss'], label='Training Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.yscale('log')
-    plt.title('Model Loss Over Epochs (Log Scale)')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss (Log Scale)')
-    plt.legend()
-    plt.grid(True, which="both", ls="--", linewidth=0.5)
-    plt.tight_layout()
-    plt.show()
-
-
-def train_utility_model(traces, window=10, save_path="utility_model.keras"):
+def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.keras"):
 
     X, y = prepare_utility_dataset(traces, window)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    normalizer = Normalization()
+    normalizer.adapt(X_train)
 
     model = Sequential([
         Input(shape=(6,)),
-        Dense(16, activation='relu'),
-        Dropout(0.2),
-        Dense(16, activation='relu'),
-        Dropout(0.2),
-        Dense(1, activation='linear')
+        normalizer,
+        Dense(64, activation='relu'),
+        Dense(32, activation='relu'),
+        Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
     es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
@@ -57,16 +44,18 @@ def train_utility_model(traces, window=10, save_path="utility_model.keras"):
     history = model.fit(
         X_train, y_train,
         validation_split=0.2,
-        epochs=200,
+        epochs=epochs,
         batch_size=4,
-        callbacks=[es],
-        verbose=1
+        callbacks=[es]
     )
 
     plot_training_history(history)
 
     y_pred = model.predict(X_test).flatten()
     mse = mean_squared_error(y_test, y_pred)
+    mae = mean_absolute_error(y_test, y_pred)
+
+    print(f"Utility model MAE: {mae:.4f}")
     print(f"Utility model MSE: {mse:.4f}")
 
     model.save(save_path)
@@ -79,10 +68,7 @@ def novelty(candidate: np.ndarray,
             n: float = 1.0,
             m: int = 10) -> float:
     
-    # print(f"\nmemory: {memory[-m:]}\n")
-    # print(f"candidate: {candidate}\n")
     diffs = memory[-m:] - candidate[np.newaxis, :]
-    # print(f"diffs: {diffs}\n")
     dists = np.linalg.norm(diffs, axis=1)
     return np.mean(dists ** n)
 
@@ -92,11 +78,8 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
                                 n: float = 1.0,
                                 max_steps: int = 100,
                                 goal_thresh: float = 250.0):
-    """
-    Variante de loop2 que, además, devuelve un `log` de posiciones
-    pre-retroceso para todas las acciones que envían a go_back_if_needed.
-    """
-    # 1) Estado inicial
+
+    # Estado inicial
     P0 = get_simple_perceptions(sim)
     S_t = np.array([
         P0['red_rotation'],  P0['red_position'],
@@ -109,14 +92,14 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
     log = []
 
     for step in range(max_steps):
-        # 2) Predicciones
+        # Predicciones
         preds = []
         for a in actions:
             x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
             S_pred = world_model.predict(x, verbose=0)[0]
             preds.append((a, S_pred))
 
-        # 3) ¿Alguna predicción alcanza la meta?
+        # ¿Alguna predicción alcanza la meta?
         goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
         if goals:
             best_action, best_pred = min(goals, key=lambda t: t[1][1])
@@ -128,14 +111,14 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
                 print(f"Meta real alcanzada en paso {step}")
             break
 
-        # 4) Novedad
+        # Novedad
         novs = [(novelty(S_pred, np.vstack(memory), n, m), a, S_pred) for a, S_pred in preds]
         novs.sort(key=lambda t: t[0], reverse=True)
 
         # for nov in novs:
         #     print(f"Paso {step}, Accion: {nov[1]} Novelty: {nov[0]}")
 
-        # 5) Top-5 intentos, con logging de pre-retroceso
+        # Top-5 intentos, con logging de pre-retroceso
         S_t1 = None
         for score, act, _ in novs[:5]:
             S_main, ev, loc = perform_main_action(robot, sim, act)
@@ -169,11 +152,11 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             robot.moveWheelsByTime(-20, -20, 1.0)
             continue
 
-        # 6) Actualizar memoria y estado
+        # Actualizar memoria y estado
         memory.append(S_t1.copy())
         S_t = S_t1
 
-        # 7) Comprobar meta real
+        # Comprobar meta real
         if S_t[1] < goal_thresh:
             print(f"Meta real alcanzada en paso {step}")
             break
