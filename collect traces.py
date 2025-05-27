@@ -14,7 +14,7 @@ TRACES_PATH = "traces/"
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
-MEMORY_SIZE = [30]
+MEMORY_SIZE = [15, 10, 5]
 EPISODES = 80
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
@@ -62,7 +62,7 @@ def main():
             rob.moveTiltTo(90,20)
 
         # Guardar trazas
-        with open(f"{TRACES_PATH}traces_M_{str(M)}v2.pkl", "wb") as f:
+        with open(f"{TRACES_PATH}traces_M_{str(M)}v3.pkl", "wb") as f:
             pickle.dump(all_traces, f)
 
         # Guardar posiciones

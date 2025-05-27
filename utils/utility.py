@@ -1,25 +1,38 @@
+from typing import Any, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Input, BatchNormalization, Dropout, Normalization
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from utils.actions import perform_main_action
-from utils.perceptions import get_simple_perceptions
+from utils.perceptions import get_perception_vector
 from utils.visualization import plot_training_history
 
 
-def prepare_utility_dataset(traces, window=10):
+def prepare_utility_dataset(
+    traces: Sequence[Sequence[Any]],
+    window: int = 10,
+    zero_samples: int = 10
+) -> Tuple[np.ndarray, np.ndarray]:
+
     X, y = [], []
     for trace in traces:
-        k = min(window, len(trace))
+        L = len(trace)
+        k = min(window, L)
+        n0 = min(zero_samples, L - k)
+
         for i in range(k):
-            S = trace[-(i+1)]
-            utility = float(i+1) / k
-            
+            S = trace[-(i + 1)]
+            utility = float(i + 1) / k
             X.append(S)
             y.append(utility)
+
+        for j in range(n0):
+            S = trace[-(k + j + 1)]
+            X.append(S)
+            y.append(0.0)
 
     return np.vstack(X), np.array(y, dtype=np.float32)
 
@@ -34,24 +47,39 @@ def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.
     model = Sequential([
         Input(shape=(6,)),
         normalizer,
+        Dense(128, activation='relu'),
+        Dropout(0.2),
+        Dense(128, activation='relu'),
         Dense(64, activation='relu'),
+        Dropout(0.2),
         Dense(32, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
     es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
 
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',
+        mode='min',
+        factor=0.5,
+        patience=5,
+        min_lr=1e-7,
+        verbose=1
+    )
+
     history = model.fit(
         X_train, y_train,
         validation_split=0.2,
         epochs=epochs,
-        batch_size=4,
-        callbacks=[es]
+        batch_size=1,
+        callbacks=[es, reduce_lr]
     )
 
     plot_training_history(history)
 
     y_pred = model.predict(X_test).flatten()
+
+    print(y_pred-y_test)
     mse = mean_squared_error(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
 
@@ -80,15 +108,8 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
                                 goal_thresh: float = 250.0):
 
     # Estado inicial
-    P0 = get_simple_perceptions(sim)
-    S_t = np.array([
-        P0['red_rotation'],  P0['red_position'],
-        P0['green_rotation'],P0['green_position'],
-        P0['blue_rotation'], P0['blue_position']
-    ], dtype=np.float32)
+    S_t = get_perception_vector(sim)
     memory = [S_t.copy()]
-
-    # Aquí acumularemos los logs: paso, x, y, si evadió
     log = []
 
     for step in range(max_steps):

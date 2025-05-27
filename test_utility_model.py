@@ -1,6 +1,6 @@
 import numpy as np
 from keras.models import load_model
-from utils.perceptions import get_perception_vector
+from utils.perceptions import get_perception_vector, get_cylinder_positions
 from robobosim.RoboboSim import RoboboSim
 from robobopy.Robobo import Robobo
 from utils.actions import perform_main_action, perform_random_action
@@ -69,7 +69,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 
-    utility_model = load_model("models/utility/utility_model4.keras")
+    utility_model = load_model("models/utility/utility_model6.keras")
     world_model = load_model("models/world/114.keras")
 
     n_moves = []

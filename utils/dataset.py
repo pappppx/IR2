@@ -1,6 +1,6 @@
 from robobopy.utils.IR import IR
 from utils.actions import perform_simple_action, perform_continuous_action, sample_random_continuous_action, avoid_if_needed
-from utils.perceptions import get_simple_perceptions, scan_for_cylinders
+from utils.perceptions import get_simple_perceptions
 import random
 import os
 import pandas as pd
@@ -13,93 +13,62 @@ def collect_simple_dataset(robot, sim, n_samples):
 
     for i in range(n_samples):
 
-        # 1) Medimos P(t) en modo simple
         P_t = get_simple_perceptions(sim)
         robot.wait(0.1)
-        # 2) Escogemos y ejecutamos acción discreta
-        accion = random.choice([-90, -45, 0, 45, 90])
-        print(f"Epoch {i}, action {accion}")
-        angle  = perform_simple_action(robot, accion, duration=0.5)
+        action = random.choice([-90, -45, 0, 45, 90])
+        print(f"Epoch {i}, action {action}")
+        angle = perform_simple_action(robot, action, duration=0.5)
         robot.wait(0.25)
         sim.wait(0.25)
         
         if angle == None:
-            # Si el robot ha realizado un movimiento evasivo, no guardamos la muestra
             robot.wait(0.1)
             
         else:
-            # 3) Medimos P(t+1)
             P_t1 = get_simple_perceptions(sim)
             if avoid_if_needed(robot):
-                # Si el robot se ha movido, espera un poco para estabilizarse
                 robot.wait(0.1)
             
-            # 4) Guardamos la muestra
             else:
                 dataset.append({
-                "red_rotation_t":   P_t["red_rotation"],
-                "red_position_t":   P_t["red_position"],
-                "green_rotation_t": P_t["green_rotation"],
-                "green_position_t": P_t["green_position"],
-                "blue_rotation_t":  P_t["blue_rotation"],
-                "blue_position_t":  P_t["blue_position"],
+            # red cylinder features
+            "red_sin_t":   P_t["red_sin"],
+            "red_cos_t":   P_t["red_cos"],
+            "red_dist_t":  P_t["red_dist"],
 
-                "action":  accion,
+            # green cylinder features
+            "green_sin_t":  P_t["green_sin"],
+            "green_cos_t":  P_t["green_cos"],
+            "green_dist_t": P_t["green_dist"],
 
-                "red_rotation_t1":   P_t1["red_rotation"],
-                "red_position_t1":   P_t1["red_position"],
-                "green_rotation_t1": P_t1["green_rotation"],
-                "green_position_t1": P_t1["green_position"],
-                "blue_rotation_t1":  P_t1["blue_rotation"],
-                "blue_position_t1":  P_t1["blue_position"],
-                })
+            # blue cylinder features
+            "blue_sin_t":   P_t["blue_sin"],
+            "blue_cos_t":   P_t["blue_cos"],
+            "blue_dist_t":  P_t["blue_dist"],
 
-    return pd.DataFrame(dataset)
+            # the action taken
+            "action": action,
 
-def collect_complex_dataset(robot, sim, n_samples):
-    dataset = []
+            # red cylinder after
+            "red_sin_t1":   P_t1["red_sin"],
+            "red_cos_t1":   P_t1["red_cos"],
+            "red_dist_t1":  P_t1["red_dist"],
 
-    for i in range(n_samples):
-        # 1) Medimos P(t) en modo complejo
-        P_t = scan_for_cylinders(robot, wheel_speed=6)
-        
-        # 2) Escogemos y ejecutamos acción continua
-        left, right = sample_random_continuous_action(max_power=20)
-        perform_continuous_action(robot, left, right, duration=2.0)
-        sim.wait(0.1)
-        robot.wait(0.1)
-        
-        # 3) Medimos P(t+1) de nuevo en modo complejo
-        P_t1 = scan_for_cylinders(robot, wheel_speed=6)
-        
-        avoid_if_needed(robot)
-        
-        # 4) Guardamos la muestra: acción es el par (left, right)
-        row = {}
+            # green cylinder after
+            "green_sin_t1":  P_t1["green_sin"],
+            "green_cos_t1":  P_t1["green_cos"],
+            "green_dist_t1": P_t1["green_dist"],
 
-        for color in ["red","green","blue"]:
-            row[f"{color}_x_t"]    = P_t[color]["x"]
-            row[f"{color}_y_t"]    = P_t[color]["y"]
-            row[f"{color}_size_t"] = P_t[color]["size"]
-
-        row["left_t"], row["right_t"] = (left, right)
-
-        for color in ["red","green","blue"]:
-            row[f"{color}_x_t1"]    = P_t1[color]["x"]
-            row[f"{color}_y_t1"]    = P_t1[color]["y"]
-            row[f"{color}_size_t1"] = P_t1[color]["size"]
-
-        dataset.append(row)
+            # blue cylinder after
+            "blue_sin_t1":   P_t1["blue_sin"],
+            "blue_cos_t1":   P_t1["blue_cos"],
+            "blue_dist_t1":  P_t1["blue_dist"],
+        })
 
     return pd.DataFrame(dataset)
+
 
 def collect_dataset(robot, sim, n_samples=50, export_name=None, simple=True):
-    """
-    Recolecta n muestras de la forma (P_t, acción, P_t1).
-    
-    - simple=True: usa el espacio discreto de ángulos y mide P_simple.
-    - simple=False: usa potencias continuas y mide P_complex.
-    """
 
     if export_name is not None:
         try:
@@ -107,10 +76,7 @@ def collect_dataset(robot, sim, n_samples=50, export_name=None, simple=True):
         except (FileNotFoundError, pd.errors.EmptyDataError) as e:
             print(f"Warning: no pude cargar CSV, lo regenero ({e})")
 
-    if simple:
-        dataset = collect_simple_dataset(robot, sim, n_samples)
-    else:
-        dataset = collect_complex_dataset(robot, sim, n_samples)
+    dataset = collect_simple_dataset(robot, sim, n_samples)
 
     if not os.path.exists(DEFAULT_CSV_PATH):
         os.makedirs(DEFAULT_CSV_PATH)
