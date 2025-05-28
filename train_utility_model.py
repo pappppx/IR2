@@ -3,7 +3,7 @@ from utils.utility import train_utility_model
 
 def main():
     # Carga de las trazas previamente guardadas
-    with open("traces/traces_M_15v3.pkl", "rb") as f:
+    with open("traces/traces_M_15v4.pkl", "rb") as f:
         all_traces = pickle.load(f)
         
     print(f"Cargadas {len(all_traces)} trazas para entrenamiento.")

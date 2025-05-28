@@ -123,10 +123,16 @@ def get_cylinder_positions(sim):
 def get_perception_vector(sim):
     P = get_simple_perceptions(sim)
     return np.array([
-        P['red_rotation'],
-        P['red_position'],
-        P['green_rotation'],
-        P['green_position'],
-        P['blue_rotation'],
-        P['blue_position']
+        # red cylinder
+        P['red_sin'],
+        P['red_cos'],
+        P['red_dist'],
+        # green cylinder
+        P['green_sin'],
+        P['green_cos'],
+        P['green_dist'],
+        # blue cylinder
+        P['blue_sin'],
+        P['blue_cos'],
+        P['blue_dist'],
     ], dtype=np.float32)

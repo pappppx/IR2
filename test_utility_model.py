@@ -58,7 +58,7 @@ def test_model(
 
         s_t1 = get_perception_vector(sim)
 
-        if s_t1[1] < goal_thresh:
+        if s_t1[2] < goal_thresh:
             print(f"Meta real alcanzada en paso {step}")
             return step
         

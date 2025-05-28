@@ -45,7 +45,7 @@ def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.
     normalizer.adapt(X_train)
 
     model = Sequential([
-        Input(shape=(6,)),
+        Input(shape=(9,)),
         normalizer,
         Dense(128, activation='relu'),
         Dropout(0.2),
@@ -121,7 +121,7 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             preds.append((a, S_pred))
 
         # ¿Alguna predicción alcanza la meta?
-        goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
+        goals = [(a, S_pred) for a, S_pred in preds if S_pred[2] < goal_thresh]
         if goals:
             best_action, best_pred = min(goals, key=lambda t: t[1][1])
             print(f"Meta predicha con acción {best_action}")
@@ -178,7 +178,7 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
         S_t = S_t1
 
         # Comprobar meta real
-        if S_t[1] < goal_thresh:
+        if S_t[2] < goal_thresh:
             print(f"Meta real alcanzada en paso {step}")
             break
         

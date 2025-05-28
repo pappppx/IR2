@@ -15,7 +15,7 @@ TRACES_PATH = "traces/"
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
 MEMORY_SIZE = [15, 10, 5]
-EPISODES = 80
+EPISODES = 20
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
 N = 3.0
@@ -25,7 +25,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
         
-    model = load_model(f"{WORLD_MODEL_PATH}114.keras")
+    model = load_model(f"{WORLD_MODEL_PATH}simple_mlp_model.keras")
     all_traces = []
     all_logs   = []
 
@@ -62,11 +62,11 @@ def main():
             rob.moveTiltTo(90,20)
 
         # Guardar trazas
-        with open(f"{TRACES_PATH}traces_M_{str(M)}v3.pkl", "wb") as f:
+        with open(f"{TRACES_PATH}traces_M_{str(M)}v4.pkl", "wb") as f:
             pickle.dump(all_traces, f)
 
         # Guardar posiciones
-        with open(f"{POSITIONS_PATH}log_M_{str(M)}v3.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}v4.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)

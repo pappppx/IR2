@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from robobopy.utils.IR import IR
-from utils.perceptions import get_simple_perceptions
+from utils.perceptions import get_simple_perceptions, get_perception_vector
 
 
 # ————— Parámetros —————
@@ -10,39 +10,25 @@ AVOID_THRESHOLD = 15      # valor IR a partir del cual hay obstáculo
 
 
 def perform_main_action(robot, sim, angle, duration=0.5):
-    """
-    Ejecuta giro + avance. 
-    Devuelve (S_main, evaded), donde:
-      - S_main: estado justo tras la maniobra principal
-                [red_rot, red_pos, green_rot, green_pos, blue_rot, blue_pos]
-      - evaded: True si luego tuvo que retroceder, False en caso contrario.
-    """
     spin_speed = 20
     forward_speed = 20
-    # 1) Giro
+
     t_turn = abs(angle) / 180.0 * 1.75
     if angle > 0:
         robot.moveWheelsByTime(-spin_speed, spin_speed, t_turn)
     elif angle < 0:
         robot.moveWheelsByTime(spin_speed, -spin_speed, t_turn)
-    # 2) Avance
+
     robot.moveWheelsByTime(forward_speed, forward_speed, duration)
     robot.wait(0.1)
 
-    # 3) Leer percepción tras la maniobra principal
-    P = get_simple_perceptions(sim)
-    S_main = np.array([
-        P['red_rotation'],  P['red_position'],
-        P['green_rotation'],P['green_position'],
-        P['blue_rotation'], P['blue_position']
-    ], dtype=np.float32)
 
+    P = get_perception_vector(sim)
     loc = sim.getRobotLocation(0)["position"]
     
-    # 4) Ver si hay que retroceder
     evaded = go_back_if_needed(robot, angle, duration)
     robot.wait(0.1)
-    return S_main, evaded, loc
+    return P, evaded, loc
 
 
 def perform_random_action(rob, spin_speed=20, forward_speed=20):
