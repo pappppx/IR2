@@ -16,7 +16,7 @@ POS_COLS   = [1, 3, 5]  # red_pos, green_pos, blue_pos
 def _load_and_split(csv_path, test_frac=0.2, seed=42):
     df = pd.read_csv(csv_path)
     df["action"] = df["action"] / 90.0
-    # barajar antes de split
+
     df = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
     feat_cols = [

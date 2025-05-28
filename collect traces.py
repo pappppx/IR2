@@ -1,4 +1,3 @@
-# from tensorflow.keras.models import load_model
 from keras.models import load_model
 from utils.utility import intrinsic_exploration_loop
 from robobosim.RoboboSim import RoboboSim
@@ -7,7 +6,7 @@ from utils.actions import perform_random_action
 import pickle, random, csv
 
 # Directorios
-WORLD_MODEL_PATH = "models/world/"
+WORLD_MODEL_PATH = "models/world/world_model.keras"
 POSITIONS_PATH = "positions/"
 TRACES_PATH = "traces/"
 
@@ -25,7 +24,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
         
-    model = load_model(f"{WORLD_MODEL_PATH}114.keras")
+    model = load_model(f"{WORLD_MODEL_PATH}")
     all_traces = []
     all_logs   = []
 
