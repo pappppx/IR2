@@ -37,49 +37,47 @@ def prepare_utility_dataset(
     return np.vstack(X), np.array(y, dtype=np.float32)
 
 
+# def prepare_utility_dataset(traces, window=10):
+#     X, y = [], []
+#     for trace in traces:
+#         k = min(window, len(trace))
+#         for i in range(k):
+#             S = trace[-(i+1)]
+#             utility = float(i+1) / k
+#             X.append(S)
+#             y.append(utility)
+#     return np.vstack(X), np.array(y, dtype=np.float32)
+
+
 def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.keras"):
 
     X, y = prepare_utility_dataset(traces, window)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
     normalizer = Normalization()
     normalizer.adapt(X_train)
 
     model = Sequential([
-        Input(shape=(9,)),
+        Input(shape=(X_train.shape[1],)),
         normalizer,
-        Dense(128, activation='relu'),
-        Dropout(0.2),
-        Dense(128, activation='relu'),
         Dense(64, activation='relu'),
-        Dropout(0.2),
-        Dense(32, activation='relu'),
+        Dense(64, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
     es = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
 
-    reduce_lr = ReduceLROnPlateau(
-        monitor='val_loss',
-        mode='min',
-        factor=0.5,
-        patience=5,
-        min_lr=1e-7,
-        verbose=1
-    )
-
     history = model.fit(
         X_train, y_train,
-        validation_split=0.2,
+        validation_split=0.1,
         epochs=epochs,
-        batch_size=1,
-        callbacks=[es, reduce_lr]
+        batch_size=8,
+        callbacks=[es]
     )
 
     plot_training_history(history)
 
     y_pred = model.predict(X_test).flatten()
 
-    print(y_pred-y_test)
     mse = mean_squared_error(y_test, y_pred)
     mae = mean_absolute_error(y_test, y_pred)
 

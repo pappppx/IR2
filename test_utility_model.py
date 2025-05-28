@@ -46,7 +46,7 @@ def test_model(
             })
 
         # Sort utility predictions by score (highest first)
-        utility_model_predictions.sort(key=lambda x: x["score"], reverse=True)
+        utility_model_predictions.sort(key=lambda x: x["score"], reverse=False)
 
         for element in utility_model_predictions:
             
@@ -70,7 +70,7 @@ def main():
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 
     utility_model = load_model("models/utility/utility_model6.keras")
-    world_model = load_model("models/world/114.keras")
+    world_model = load_model("models/world/simple_mlp_model.keras")
 
     n_moves = []
 
