@@ -1,10 +1,10 @@
 from utils.visualization import plot_position_scatter
+import pandas as pd
 
 def main():
-    plot_position_scatter('positions/log_M_25v2.csv')
 
-    # Scatter solo del episodio 5
-    # plot_position_scatter('datasets/positions_log.csv', episode=5)
+    df = pd.read_csv('positions/log_M_30.csv')
+    plot_position_scatter(df, plot_cylinder=True)
 
 if __name__ == "__main__":
     main()
