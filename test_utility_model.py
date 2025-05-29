@@ -69,7 +69,7 @@ def main():
     sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
     rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
 
-    utility_model = load_model("models/utility/utility_model.keras")
+    utility_model = load_model("models/utility/utility_model4.keras")
     world_model = load_model("models/world/world_model.keras")
 
     n_moves = []

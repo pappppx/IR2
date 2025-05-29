@@ -13,11 +13,11 @@ TRACES_PATH = "traces/"
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
-MEMORY_SIZE = [30]
-EPISODES = 80
+MEMORY_SIZE = [10, 5]
+EPISODES = 20
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
-N = 3.0
+N = 2.0
 GOAL_THRESH = 350.0
 
 def main():
@@ -65,7 +65,7 @@ def main():
             pickle.dump(all_traces, f)
 
         # Guardar posiciones
-        with open(f"{POSITIONS_PATH}log_M_{str(M)}v3.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}v2.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)

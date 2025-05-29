@@ -24,9 +24,10 @@ def prepare_utility_dataset(traces, window=10):
     return np.vstack(X), np.array(y, dtype=np.float32)
 
 
-def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.keras"):
+def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.keras"):
 
     X, y = prepare_utility_dataset(traces, window)
+    print(len(X), "ejemplos de entrenamiento generados")
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     normalizer = Normalization()
     normalizer.adapt(X_train)
@@ -34,8 +35,7 @@ def train_utility_model(traces, window=10, epochs=100, save_path="utility_model.
     model = Sequential([
         Input(shape=(6,)),
         normalizer,
-        Dense(64, activation='relu'),
-        Dense(32, activation='relu'),
+        Dense(4, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -103,7 +103,7 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
         goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
         if goals:
             best_action, best_pred = min(goals, key=lambda t: t[1][1])
-            print(f"Meta predicha con acción {best_action}")
+            print(f"Meta predicha en paso {step} con acción {best_action}")
             memory.append(best_pred.copy())
             S_main, ev, loc = perform_main_action(robot, sim, best_action)
             # si evadió, no revisamos meta real (se quedó en retroceso)
