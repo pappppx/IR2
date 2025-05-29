@@ -6,7 +6,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Input, BatchNormalization, Dropout, Normalization
 from tensorflow.keras.callbacks import EarlyStopping
 from utils.actions import perform_main_action
-from utils.perceptions import get_simple_perceptions
+from utils.perceptions import get_perception_vector, get_simple_perceptions
 from utils.visualization import plot_training_history
 
 def prepare_utility_dataset(traces, window=10, decay_factor=0.8):
@@ -22,12 +22,21 @@ def prepare_utility_dataset(traces, window=10, decay_factor=0.8):
     return np.vstack(X), np.array(y, dtype=np.float32)
 
 
-def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.keras"):
+def train_utility_model(traces, val_split = 0.2, test_split = 0.2, window=10, epochs=300, save_path="utility_model.keras"):
 
-    train_traces = traces[:int(len(traces) * 0.8)]
-    test_traces  = traces[int(len(traces) * 0.8):]
+    len_traces = len(traces)
+
+    train_index = int(len_traces * (1 - val_split - test_split))
+    val_index = int(len_traces * (1 - test_split))
+
+    train_traces = traces[:train_index]
+    val_traces = traces[train_index:val_index]
+    test_traces = traces[val_index:]
+    
     X_train, y_train = prepare_utility_dataset(train_traces, window)
+    X_val, y_val = prepare_utility_dataset(val_traces, window)
     X_test, y_test   = prepare_utility_dataset(test_traces, window)
+
     normalizer = Normalization()
     normalizer.adapt(X_train)
 
@@ -35,7 +44,6 @@ def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.
         Input(shape=(6,)),
         normalizer,
         Dense(8, activation='relu'),
-        Dense(16, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -43,9 +51,9 @@ def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.
 
     history = model.fit(
         X_train, y_train,
-        validation_data=(X_test, y_test),
+        validation_data=(X_val, y_val),
         epochs=epochs,
-        batch_size=32,
+        batch_size=16,
         callbacks=[es]
     )
 
@@ -79,72 +87,44 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
                                 max_steps: int = 100,
                                 goal_thresh: float = 250.0):
 
-    # Estado inicial
-    P0 = get_simple_perceptions(sim)
-    S_t = np.array([
-        P0['red_rotation'],  P0['red_position'],
-        P0['green_rotation'],P0['green_position'],
-        P0['blue_rotation'], P0['blue_position']
-    ], dtype=np.float32)
+    S_t = get_perception_vector(sim)
     memory = [S_t.copy()]
-
-    # Aquí acumularemos los logs: paso, x, y, si evadió
     log = []
 
     for step in range(max_steps):
-        # Predicciones
+
         preds = []
         for a in actions:
             x = np.hstack([S_t, a/90.0]).astype(np.float32)[None,:]
             S_pred = world_model.predict(x, verbose=0)[0]
             preds.append((a, S_pred))
 
-        # ¿Alguna predicción alcanza la meta?
         goals = [(a, S_pred) for a, S_pred in preds if S_pred[1] < goal_thresh]
         if goals:
             best_action, best_pred = min(goals, key=lambda t: t[1][1])
             print(f"Meta predicha en paso {step} con acción {best_action}")
             memory.append(best_pred.copy())
             S_main, ev, loc = perform_main_action(robot, sim, best_action)
-            # si evadió, no revisamos meta real (se quedó en retroceso)
+
             if not ev and S_main[1] < goal_thresh:
                 print(f"Meta real alcanzada en paso {step}")
             break
 
-        # Novedad
         novs = [(novelty(S_pred, np.vstack(memory), n, m), a, S_pred) for a, S_pred in preds]
         novs.sort(key=lambda t: t[0], reverse=True)
 
-        # for nov in novs:
-        #     print(f"Paso {step}, Accion: {nov[1]} Novelty: {nov[0]}")
-
-        # Top-5 intentos, con logging de pre-retroceso
         S_t1 = None
         for score, act, _ in novs[:5]:
             S_main, ev, loc = perform_main_action(robot, sim, act)
             sim.wait(0.1); robot.wait(0.1)
 
             if ev:
-                # Logueamos la posición previa al retroceso
-                log.append({
-                    "step":   step,
-                    "x":      loc["x"],
-                    "z":      loc["z"],
-                    "evaded": True
-                })
-                # Añadimos a memory para penalizar esa zona y seguimos
+                log_position(log, step, loc, evaded=True)
                 memory.append(S_main.copy())
                 continue
 
-            # Si no evadió, aceptamos ese nuevo estado
             S_t1 = S_main
-            # Podemos también loguear las transiciones exitosas:
-            log.append({
-                "step":   step,
-                "x":      loc["x"],
-                "z":      loc["z"],
-                "evaded": False
-            })
+            log_position(log, step, loc, evaded=False)
             break
 
         if S_t1 is None:
@@ -152,11 +132,9 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             robot.moveWheelsByTime(-20, -20, 1.0)
             continue
 
-        # Actualizar memoria y estado
         memory.append(S_t1.copy())
         S_t = S_t1
 
-        # Comprobar meta real
         if S_t[1] < goal_thresh:
             print(f"Meta real alcanzada en paso {step}")
             break
@@ -166,5 +144,13 @@ def intrinsic_exploration_loop(robot, sim, world_model, actions,
             memory = None
             break
 
-    # Al final, devolvemos tanto la memoria como el log de posiciones
     return memory, log
+
+
+def log_position(log, step, loc, evaded):
+    log.append({
+        "step":   step,
+        "x":      loc["x"],
+        "z":      loc["z"],
+        "evaded": evaded
+    })

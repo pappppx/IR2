@@ -2,18 +2,17 @@ import pickle
 from utils.utility import train_utility_model
 
 def main():
-    # Carga de las trazas previamente guardadas
-    with open("traces/traces_model_114_M_40.pkl", "rb") as f:
+
+    with open("traces/traces_M_15v3.pkl", "rb") as f:
         all_traces = pickle.load(f)
         
-    print(f"Cargadas {len(all_traces)} trazas para entrenamiento.")
+    print(f"Cargadas {len(all_traces)} trazas, con media de {sum(len(t) for t in all_traces)/len(all_traces):.2f} pasos")
 
-    # Entrenamiento del Utility Model
     train_utility_model(
         traces=all_traces,
         epochs=300,
-        window=20,
-        save_path="models/utility/utility_model5.keras"
+        window=15,
+        save_path="models/utility/utility_model6.keras"
     )
 
 if __name__ == "__main__":

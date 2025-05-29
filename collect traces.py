@@ -13,11 +13,11 @@ TRACES_PATH = "traces/"
 # Parámetros
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
-MEMORY_SIZE = [10, 5]
+MEMORY_SIZE = [15]
 EPISODES = 20
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
-N = 2.0
+N = 3.0
 GOAL_THRESH = 350.0
 
 def main():
@@ -33,7 +33,6 @@ def main():
         for ep in range(EPISODES):
             print(f"\n=== Episodio {ep+1} ===")
 
-            # Movimiento inicial aleatorio
             perform_random_action(rob, SPIN_SPEED, FORWARD_SPEED)
 
             trace, log = intrinsic_exploration_loop(
@@ -60,12 +59,10 @@ def main():
             rob.moveTiltTo(110,20)
             rob.moveTiltTo(90,20)
 
-        # Guardar trazas
-        with open(f"{TRACES_PATH}traces_M_{str(M)}v2.pkl", "wb") as f:
+        with open(f"{TRACES_PATH}traces_M_{str(M)}.pkl", "wb") as f:
             pickle.dump(all_traces, f)
 
-        # Guardar posiciones
-        with open(f"{POSITIONS_PATH}log_M_{str(M)}v2.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)
