@@ -56,8 +56,6 @@ def main():
             
             sim.resetSimulation()
             sim.wait(3)
-            rob.moveTiltTo(110,20)
-            rob.moveTiltTo(90,20)
 
         with open(f"{TRACES_PATH}traces_M_{str(M)}.pkl", "wb") as f:
             pickle.dump(all_traces, f)
