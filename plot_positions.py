@@ -3,8 +3,8 @@ import pandas as pd
 
 def main():
 
-    df = pd.read_csv('positions/log_M_30v2.csv')  
-    plot_position_scatter(df, plot_cylinder=True)
+    df = pd.read_csv('positions/log_M_15v3.csv')  
+    plot_position_scatter(df, plot_cylinder=True, last_n=10)
 
 if __name__ == "__main__":
     main()

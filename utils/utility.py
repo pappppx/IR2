@@ -9,33 +9,33 @@ from utils.actions import perform_main_action
 from utils.perceptions import get_simple_perceptions
 from utils.visualization import plot_training_history
 
-
-def prepare_utility_dataset(traces, window=10):
+def prepare_utility_dataset(traces, window=10, decay_factor=0.8):
     X, y = [], []
     for trace in traces:
         k = min(window, len(trace))
         for i in range(k):
-            S = trace[-(i+1)]
-            utility = float(i+1) / k
+            S = trace[-(i + 1)]
+            utility = decay_factor ** (k - i - 1)
             
             X.append(S)
             y.append(utility)
-
     return np.vstack(X), np.array(y, dtype=np.float32)
 
 
 def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.keras"):
 
-    X, y = prepare_utility_dataset(traces, window)
-    print(len(X), "ejemplos de entrenamiento generados")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    train_traces = traces[:int(len(traces) * 0.8)]
+    test_traces  = traces[int(len(traces) * 0.8):]
+    X_train, y_train = prepare_utility_dataset(train_traces, window)
+    X_test, y_test   = prepare_utility_dataset(test_traces, window)
     normalizer = Normalization()
     normalizer.adapt(X_train)
 
     model = Sequential([
         Input(shape=(6,)),
         normalizer,
-        Dense(4, activation='relu'),
+        Dense(8, activation='relu'),
+        Dense(16, activation='relu'),
         Dense(1)
     ])
     model.compile(optimizer='adam', loss='mse')
@@ -43,9 +43,9 @@ def train_utility_model(traces, window=10, epochs=300, save_path="utility_model.
 
     history = model.fit(
         X_train, y_train,
-        validation_split=0.2,
+        validation_data=(X_test, y_test),
         epochs=epochs,
-        batch_size=4,
+        batch_size=32,
         callbacks=[es]
     )
 
