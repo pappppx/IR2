@@ -14,23 +14,24 @@ TRACES_PATH = "traces/"
 MAX_STEPS = 400
 ACTIONS = [-90, -45, 0, 45, 90]
 MEMORY_SIZE = [15]
-EPISODES = 20
+EPISODES = 40
 SPIN_SPEED = 20
 FORWARD_SPEED = 20
 N = 3.0
-GOAL_THRESH = 350.0
+GOAL_THRESH = 250.0
 
 def main():
-    sim = RoboboSim('localhost'); sim.connect(); sim.wait(0.5)
-    rob = Robobo('localhost'); rob.connect(); rob.wait(0.5)
-        
+    sim = RoboboSim('localhost'); sim.connect()
+    rob = Robobo('localhost'); rob.connect()
+    
     model = load_model(f"{WORLD_MODEL_PATH}")
     all_traces = []
     all_logs   = []
 
     for M in MEMORY_SIZE:
         print(f"\n=== Tamaño de memoria: {abs(M)} ===")
-        for ep in range(EPISODES):
+        ep = 0
+        while ep < EPISODES:
             print(f"\n=== Episodio {ep+1} ===")
 
             perform_random_action(rob, SPIN_SPEED, FORWARD_SPEED)
@@ -45,22 +46,23 @@ def main():
                 max_steps=MAX_STEPS,
                 goal_thresh=GOAL_THRESH
             )
-            if trace is None:
-                print("No se ha detectado meta en el episodio")
-            else:
+
+            if trace is not None:
+
+                ep += 1
                 all_traces.append(trace)
-            
-            for row in log:
-                row["episode"] = ep+1
-            all_logs.extend(log)
+    
+                for row in log:
+                    row["episode"] = ep
+                all_logs.extend(log)
             
             sim.resetSimulation()
-            sim.wait(3)
+            sim.wait(1)
 
-        with open(f"{TRACES_PATH}traces_M_{str(M)}.pkl", "wb") as f:
+        with open(f"{TRACES_PATH}traces_M_{str(M)}v4.pkl", "wb") as f:
             pickle.dump(all_traces, f)
 
-        with open(f"{POSITIONS_PATH}log_M_{str(M)}.csv","w",newline="") as f:
+        with open(f"{POSITIONS_PATH}log_M_{str(M)}v4.csv","w",newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["episode","step","x","z","evaded"])
             writer.writeheader()
             writer.writerows(all_logs)

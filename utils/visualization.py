@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 CYLINDER_POSITIONS = {'red': {'x': 600.0, 'y': 10.0, 'z': -600.0}, 'blue': {'x': 600.0, 'y': 10.0, 'z': 600.0}, 'green': {'x': -600.0, 'y': 10.0, 'z': -600.0}}
 
@@ -70,3 +71,24 @@ def plot_position_scatter(df,
         print(f"Scatter guardado en '{scatter_path}'")
     else:
         plt.show()
+
+
+def plot_distance_vs_utility(epoch_logs):
+
+    plt.figure(figsize=(8, 6))
+    cmap = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    for idx, single_log in enumerate(epoch_logs):
+        distances = np.array([entry['distance'] for entry in single_log])
+        utilities = np.array([entry['utility_score'] for entry in single_log])
+
+        color = cmap[idx % len(cmap)]
+        plt.scatter(distances, utilities, color=color, alpha=0.7, edgecolors='k', label=f"Ep. {idx+1}")
+
+    plt.xlabel("Distance (sensor reading)")
+    plt.ylabel("Utility score (predicción)")
+    plt.title("Distance vs. Utility Score (coloreado por episodio)")
+    plt.grid(True)
+    plt.legend(title="Episodios")
+    plt.tight_layout()
+    plt.show()
